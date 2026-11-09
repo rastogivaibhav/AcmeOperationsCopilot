@@ -1,0 +1,8 @@
+W01-W06 OFFLINE VERIFICATION — 2026-11-09
+python -m pytest -q tests
+..............................                                           [100%]
+30 passed
+Python compileall PASS
+Compose YAML, Keycloak JSON and Python TOML parse PASS
+Jinja landing/workspace render + HTML escaping PASS
+NOT run: docker compose up / real OAuth browser redirect / Redis sessions / PostgreSQL migrations / MCP protocol / Ollama.

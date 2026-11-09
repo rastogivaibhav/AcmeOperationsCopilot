@@ -1,0 +1,142 @@
+name: acme-copilot
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-acme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-acme-password-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-acme}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+    networks: [backend]
+
+  redis:
+    image: redis:7.4.12-alpine
+    command: ["redis-server", "--appendonly", "no"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 12
+    networks: [backend]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.2
+    command: ["start-dev", "--import-realm", "--hostname=http://localhost:8080"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-local-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-LocalOnlyChangeThis123!}
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "127.0.0.1:${KEYCLOAK_PORT:-8080}:8080"
+    healthcheck:
+      # Official Keycloak example: /health/ready lives on management port 9000.
+      test: ["CMD", "bash", "-c", "{ printf 'HEAD /health/ready HTTP/1.0\r\n\r\n' >&0; grep -q 'HTTP/1.0 200'; } 0<>/dev/tcp/localhost/9000"]
+      interval: 10s
+      timeout: 5s
+      start_period: 40s
+      retries: 15
+    volumes:
+      - ./infrastructure/keycloak/acme-realm.json:/opt/keycloak/data/import/acme-realm.json:ro
+      - kcdata:/opt/keycloak/data/h2
+    networks: [backend]
+
+  ollama:
+    image: ollama/ollama:0.40.15
+    volumes:
+      - ollamadata:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+    networks: [backend]
+
+  model-init:
+    image: ollama/ollama:0.40.15
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["OLLAMA_HOST=http://ollama:11434 ollama pull ${OLLAMA_MODEL:-qwen2.5:3b}"]
+    depends_on:
+      ollama: {condition: service_healthy}
+    networks: [backend]
+    restart: "no"
+
+  db-init:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    command: ["/bin/sh", "-c", "alembic upgrade head && python -m database.seed"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-acme}:${POSTGRES_PASSWORD:-local-acme-password-change-me}@postgres:5432/${POSTGRES_DB:-acme}
+      POSTGRES_USER: ${POSTGRES_USER:-acme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-acme-password-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-acme}
+    depends_on:
+      postgres: {condition: service_healthy}
+    networks: [backend]
+    restart: "no"
+
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-acme}:${POSTGRES_PASSWORD:-local-acme-password-change-me}@postgres:5432/${POSTGRES_DB:-acme}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8080/realms/acme}
+      KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/acme/protocol/openid-connect/certs
+      MCP_RESOURCE_URL: http://mcp:8001/mcp
+    depends_on:
+      db-init: {condition: service_completed_successfully}
+      keycloak: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.create_connection(('127.0.0.1',8001),3); s.close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [backend]
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-acme}:${POSTGRES_PASSWORD:-local-acme-password-change-me}@postgres:5432/${POSTGRES_DB:-acme}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8080/realms/acme}
+      KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/acme/protocol/openid-connect/certs
+      MCP_URL: http://mcp:8001/mcp
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
+      OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-none}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8000}
+      REDIS_URL: redis://redis:6379/0
+      KEYCLOAK_TOKEN_URL: http://keycloak:8080/realms/acme/protocol/openid-connect/token
+    ports:
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz',timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    depends_on:
+      db-init: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+      mcp: {condition: service_healthy}
+      model-init: {condition: service_completed_successfully}
+    networks: [backend]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  kcdata:
+  ollamadata:
+networks:
+  backend: {}

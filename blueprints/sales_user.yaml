@@ -1,0 +1,6 @@
+role: sales_user
+version: '0.4.0'
+persona: Account Insights Agent
+mission: Provide read-only customer account and issue insights to sales employees.
+tools: [find_customer, list_open_issues, get_issue_history]
+skills: [customer_escalation_summary]

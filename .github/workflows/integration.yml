@@ -1,0 +1,54 @@
+name: Acme Copilot Live Compose Integration
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  full-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    env:
+      OLLAMA_MODEL: qwen2.5:3b
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start full assessment stack
+        run: docker compose up --build -d
+      - name: Confirm container health and readiness
+        run: |
+          docker compose ps
+          curl --fail --retry 20 --retry-delay 8 --retry-connrefused http://127.0.0.1:8000/readyz
+      - name: Authentication and MCP foundation tests
+        run: |
+          docker compose exec -T web python -m app.smoke
+          docker compose exec -T web python -m app.smoke_w06
+      - name: Controlled business write integration
+        run: docker compose exec -T web python -m app.smoke_w10
+      - name: Observability integration
+        run: docker compose exec -T web python -m app.telemetry.smoke_w11
+      - name: Real model and LangGraph evaluation
+        run: |
+          docker compose exec -T web python -m app.agent.probe
+          docker compose exec -T web python -m app.agent.smoke_w08
+          docker compose exec -T web python -m app.skills.smoke_w09
+      - name: Ten-question W13 agent evaluation
+        run: docker compose exec -T web python -m evals.run_w13
+      - name: Release evidence gate
+        if: always()
+        run: python scripts/verify_release.py
+      - name: Copy results from ephemeral containers
+        if: always()
+        continue-on-error: true
+        run: docker compose cp web:/code/evals/results ./live-results
+      - name: Upload evaluation reports (no credentials)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acme-live-evaluation
+          path: live-results/
+          if-no-files-found: ignore
+      - name: Runtime service status
+        if: always()
+        run: docker compose ps
+      - name: Tear down temporary stack
+        if: always()
+        run: docker compose down -v --remove-orphans

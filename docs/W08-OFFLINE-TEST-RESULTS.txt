@@ -1,0 +1,5 @@
+................................................................         [100%]
+64 passed in 0.31s
+Python compilation: PASS
+Node.js browser syntax: PASS
+Docker/MCP/Keycloak/Ollama/Postgres integration: NOT RUN (runtime unavailable)

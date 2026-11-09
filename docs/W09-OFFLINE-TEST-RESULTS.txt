@@ -1,0 +1,5 @@
+........................................................................ [ 82%]
+...............                                                          [100%]
+87 passed in 0.31s
+JSON, TOML and Python compile checks PASSED
+Browser JS syntax PASSED

@@ -1,0 +1,20 @@
+flowchart TB
+    User[Employee in web browser] --> Web[FastAPI BFF and Jinja workspace]
+    Web <-->|OIDC code + PKCE| Keycloak[Keycloak IAM]
+    Web <--> Redis[(Redis short-lived sessions)]
+    Web --> Factory[Blueprint factory: enterprise + team + verified role]
+    Factory --> Graph[LangGraph state machine]
+    Graph <--> Ollama[Local Ollama tool-capable LLM]
+    Graph --> Escalation[Read-only escalation Skill]
+    Graph <-->|Checkpointed state| Pg[(PostgreSQL)]
+    Graph --> MCPClient[Authenticated MCP client]
+    Escalation --> MCPClient
+    MCPClient --> MCP[Acme MCP server]
+    MCP --> Policy[Verified user, role and customer scope]
+    Policy --> Pg
+    Web --> Human[Explicit human confirmation]
+    Human --> MCPClient
+    Graph --> Trace[Execution spans and tool events]
+    MCP --> Audit[Business action receipts and audit events]
+    Trace --> Pg
+    Audit --> Pg

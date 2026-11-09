@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Your workspace — Acme Operations</title><link rel="stylesheet" href="/static/style.css"></head>
+<body><header class="shell bar"><a class="brand" href="/app"><span class="logo">A</span><span>Acme <b>Operations</b></span></a>
+<div class="right"><span class="role-badge">{{ role|replace('_', ' ')|title }}</span><button id="logout" class="ghost">Sign out</button></div></header>
+<main class="shell dashboard" id="workspace" data-csrf="{{ csrf_token }}">
+<div class="page-heading"><div><div class="tag">IDENTITY-BOUND AGENT WORKSPACE</div><h1>Welcome, {{ username }}</h1><p>Every operation is performed under your verified enterprise identity.</p></div><span class="identity-indicator">● Identity verified</span></div>
+<div class="columns"><section class="panel main-panel"><div class="panel-header"><div><small>YOUR PERSONAL AGENT</small><h2>{{ agent_persona }}</h2></div><div class="avatar">✧</div></div>
+<p class="muted">Your agent inherits the enterprise blueprint and role-specific read tools and guarded action proposals. Its answers come from the local model and authenticated business records.</p>
+<div class="capabilities"><h3>Your account permissions</h3><div class="chips">{% for permission in permissions %}<span class="chip">{{ permission|replace('_',' ')|title }}</span>{% endfor %}</div><p class="muted">The agent can only propose changes. The confirmation form below is required for an authorised business write.</p></div>
+<section class="chat" aria-label="Agent conversation">
+  <div id="chat-title" class="chat-title">Select or create an investigation</div>
+  <div id="chat-messages" class="chat-messages" aria-live="polite"><p class="muted">Conversation history appears here when you open an investigation.</p></div>
+  <form id="chat-form" class="chat-form">
+    <label for="chat-input">Message to your agent</label>
+    <textarea id="chat-input" rows="3" maxlength="2000" required disabled placeholder="Ask about customer issues, histories or escalation status"></textarea>
+    <button id="chat-send" type="submit" class="primary compact" disabled>Send to agent</button>
+  </form>
+  <div id="chat-evidence" class="chat-evidence" aria-live="polite"></div>
+</section>
+{% if role in ['support_user','admin'] %}
+<section id="write-workflow" class="action-panel" aria-label="Review proposed business action">
+  <h3>Controlled action centre</h3>
+  <p class="muted">Changes are never executed directly by the AI. Review exact details, then confirm with your verified identity.</p>
+  <form id="action-prepare-form">
+    <label for="action-kind">Action type</label>
+    <select id="action-kind" required>
+      <option value="issue_update">Update issue status</option>
+      {% if role == 'admin' %}<option value="next_action">Create next-action record</option>{% endif %}
+    </select>
+    <label for="action-issue-id">Issue UUID</label>
+    <input id="action-issue-id" required pattern="[a-fA-F0-9-]{36}" placeholder="From the issue's evidence record">
+    <div id="issue-change-fields">
+      <label for="action-status">New status</label>
+      <select id="action-status"><option value="investigating">Investigating</option>
+        <option value="resolved">Resolved</option><option value="closed">Closed</option>
+        <option value="open">Open</option></select>
+      <label for="action-version">Current issue version</label>
+      <input id="action-version" type="number" min="1" value="1">
+      <label for="action-note">Reason for update</label>
+      <textarea id="action-note" rows="2" maxlength="600" placeholder="Explain why the status should change"></textarea>
+    </div>
+    <div id="next-action-fields" hidden>
+      <label for="action-description">Recommended next action</label>
+      <textarea id="action-description" rows="3" maxlength="1000" placeholder="Describe the approved follow-up"></textarea>
+    </div>
+    <button type="submit" class="primary compact" id="action-review">Review before committing</button>
+  </form>
+  <section id="action-confirm-panel" class="confirmation" hidden aria-label="Confirm proposed action">
+    <h3>Confirm business change</h3>
+    <pre id="action-preview"></pre>
+    <p class="muted">Only this confirmed payload will be written. This approval expires after ten minutes.</p>
+    <div class="action-buttons"><button id="action-confirm" class="primary">Confirm and execute</button>
+      <button id="action-cancel" class="ghost">Cancel</button></div>
+  </section>
+  <div id="action-result" class="action-result" role="status" aria-live="polite"></div>
+</section>
+{% endif %}
+</section><aside class="panel side-panel"><div class="panel-header"><div><small>YOUR ACTIVITY</small><h2>Investigations</h2></div></div><p class="muted">Conversation records are owned by your Keycloak account.</p>
+<form id="new-conversation"><label for="title">New investigation</label><input id="title" name="title" maxlength="120" required value="Customer issue review"><button type="submit" class="primary compact">Create conversation</button></form>
+<div id="error" class="error" role="alert" hidden></div><div id="conversations" class="conversation-list"><p class="muted">Loading your conversations…</p></div>
+<section class="activity-panel" aria-label="Agent execution activity">
+  <div class="activity-title"><h3>Agent activity</h3><button type="button" class="ghost activity-refresh" id="activity-refresh">Refresh</button></div>
+  <p class="muted">Your own executions, tool decisions, timings and recoverable errors. No credentials or raw prompts.</p>
+  <div id="activity-summary" class="activity-summary" aria-live="polite">Loading execution summary…</div>
+  <div id="activity-runs" class="activity-runs" aria-live="polite"></div>
+  <div id="activity-details" class="activity-details" hidden aria-live="polite"></div>
+  <h3 class="activity-audit-heading">Business action audit</h3>
+  <div id="activity-audit" class="activity-runs" aria-live="polite"></div>
+</section>
+</aside></div>
+<div class="security-note">🔒 &nbsp; The browser stores an opaque session cookie. Access tokens remain in the server-side session store.</div>
+</main><script src="/static/workspace.js" defer></script></body></html>

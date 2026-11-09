@@ -1,0 +1,40 @@
+[project]
+name = "acme-operations-copilot"
+version = "0.1.0"
+description = "EY Applied AI technical assessment - local identity-aware operations assistant"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "fastapi>=0.115,<1.0",
+  "uvicorn>=0.34,<1.0",
+  "mcp==2.2.0",
+  "psycopg[binary]>=3.2,<4.0",
+  "PyJWT[crypto]>=2.10,<3.0",
+  "sqlalchemy>=2.0,<3.0",
+  "alembic>=1.15,<2.0",
+  "httpx2>=2.5,<3",
+  "pydantic>=2.10,<3.0",
+  "redis>=5.2,<7",
+  "jinja2>=3.1,<4",
+  "PyYAML>=6.0,<7",
+  "langgraph>=1.1,<2",
+  "langgraph-checkpoint-postgres>=3,<4",
+  "opentelemetry-api>=1.30,<2",
+  "opentelemetry-sdk>=1.30,<2"
+]
+[project.optional-dependencies]
+test = ["pytest>=8,<10", "pytest-asyncio>=0.25,<2", "httpx>=0.28,<1"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*", "acme_shared*", "database*", "mcp_server*"]

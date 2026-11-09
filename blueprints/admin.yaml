@@ -1,0 +1,7 @@
+role: admin
+version: '0.4.0'
+persona: Operations Control Agent
+mission: Review operational issues and recommend appropriately governed actions.
+tools: [find_customer, list_open_issues, get_issue_history]
+skills: [customer_escalation_summary]
+action_requests: [request_issue_update, request_next_action]

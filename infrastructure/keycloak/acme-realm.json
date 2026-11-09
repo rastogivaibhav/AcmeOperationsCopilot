@@ -1,0 +1,135 @@
+{
+  "realm": "acme",
+  "enabled": true,
+  "displayName": "Acme Operations (LOCAL DEMO)",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "sslRequired": "none",
+  "roles": {
+    "realm": [
+      {
+        "name": "sales_user",
+        "description": "Read assigned customer profiles and issues"
+      },
+      {
+        "name": "support_user",
+        "description": "Read and update customer issues"
+      },
+      {
+        "name": "admin",
+        "description": "Full operational administration"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "acme-web",
+      "name": "Acme local web client",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:8000/auth/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:8000"
+      ],
+      "defaultClientScopes": [
+        "profile",
+        "email",
+        "roles",
+        "web-origins",
+        "acr"
+      ],
+      "protocolMappers": [
+        {
+          "name": "acme-mcp-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "acme-mcp",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "acme-web-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "acme-web",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:8000/"
+      }
+    }
+  ],
+  "users": [
+    {
+      "id": "cafe0000-0000-4000-8000-000000000001",
+      "username": "sales-demo",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Alex",
+      "lastName": "Sales",
+      "email": "sales@acme.invalid",
+      "realmRoles": [
+        "sales_user"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "SalesLocal2026!",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "cafe0000-0000-4000-8000-000000000002",
+      "username": "support-demo",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Jordan",
+      "lastName": "Support",
+      "email": "support@acme.invalid",
+      "realmRoles": [
+        "support_user"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "SupportLocal2026!",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "cafe0000-0000-4000-8000-000000000003",
+      "username": "admin-demo",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Morgan",
+      "lastName": "Admin",
+      "email": "admin@acme.invalid",
+      "realmRoles": [
+        "admin"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "AdminLocal2026!",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

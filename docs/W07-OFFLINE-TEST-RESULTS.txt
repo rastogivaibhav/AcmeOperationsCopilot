@@ -1,0 +1,6 @@
+...............................................                          [100%]
+47 passed in 0.34s
+Python compilation, JSON and TOML schema smoke checks: PASS.
+Verification environment: no Docker executable, MCP Python runtime, httpx2, psycopg, or Ollama daemon available.
+Live Keycloak, MCP transport, Docker images and Ollama tool selection: NOT TESTED.
+Do not interpret these deterministic unit tests as actual model benchmark results.

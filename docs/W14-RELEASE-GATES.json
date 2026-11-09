@@ -1,0 +1,15 @@
+{
+  "status": "source_ready_live_unverified",
+  "required_file_count": 23,
+  "missing_required_files": [],
+  "confidential_documents_in_repo": [],
+  "untracked_env_files_present": [],
+  "ten_unique_evaluation_questions": true,
+  "live_gates": {
+    "foundation": "not_run",
+    "agent_evaluation": "not_run"
+  },
+  "github_repository_published": "unverified",
+  "docker_image_build": "unverified",
+  "publication_restriction": "keep private during candidate assessment window"
+}

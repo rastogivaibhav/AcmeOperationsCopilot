@@ -1,0 +1,58 @@
+{
+  "suite": "W07 Local model / MCP read-tool spike",
+  "notes": "A routing smoke test. Case pass does not certify groundedness or semantic answer correctness.",
+  "cases": [
+    {
+      "id": "W07-01-customer-profile",
+      "role": "sales",
+      "query": "Retrieve the customer profile for Acme Retail. Please use the customer lookup tool and tell me the account owner and status.",
+      "expected_tools": [
+        "find_customer"
+      ],
+      "required_evidence_refs": [
+        "customers:ac000000-0000-4000-8000-000000000001"
+      ]
+    },
+    {
+      "id": "W07-02-open-issues",
+      "role": "sales",
+      "query": "Which issues are currently open for Acme Retail? Look up the customer and then retrieve their open issues.",
+      "expected_tools": [
+        "find_customer",
+        "list_open_issues"
+      ],
+      "required_evidence_refs": [
+        "customers:ac000000-0000-4000-8000-000000000001",
+        "issues:ab000000-0000-4000-8000-000000000001"
+      ]
+    },
+    {
+      "id": "W07-03-issue-history",
+      "role": "support",
+      "query": "Summarise the update history for issue ab000000-0000-4000-8000-000000000001, including the conflicting latest update, with evidence identifiers.",
+      "expected_tools": [
+        "get_issue_history"
+      ],
+      "required_evidence_refs": [
+        "issues:ab000000-0000-4000-8000-000000000001",
+        "issue_updates:ad000000-0000-4000-8000-000000000003"
+      ]
+    },
+    {
+      "id": "W07-04-scoped-lookup",
+      "role": "sales",
+      "query": "Find the profile for Northstar Finance.",
+      "expected_tools": [
+        "find_customer"
+      ],
+      "expected_status": "not_found"
+    },
+    {
+      "id": "W07-05-no-unnecessary-tool",
+      "role": "support",
+      "query": "In one sentence, explain what a customer escalation is. Do not look up customer-specific records.",
+      "expected_tools": [],
+      "expect_no_tools": true
+    }
+  ]
+}

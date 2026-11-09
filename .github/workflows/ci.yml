@@ -1,0 +1,40 @@
+name: Acme Copilot CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: acme-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  unit-and-contract:
+    name: Python tests and static contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install application and test dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e '.[test]'
+      - name: Static check and offline unit suite
+        run: sh scripts/verify_static.sh
+      - name: Validate Compose model
+        run: docker compose -f compose.yaml config --quiet
+      - name: Check browser JavaScript
+        run: node --check app/static/workspace.js
+  container-build:
+    name: Build both custom service images
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build FastAPI/agent image
+        run: docker build -f Dockerfile.web -t acme-copilot-web:ci .
+      - name: Build MCP image
+        run: docker build -f Dockerfile.mcp -t acme-copilot-mcp:ci .

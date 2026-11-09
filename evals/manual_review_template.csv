@@ -1,0 +1,11 @@
+case_id,role,factual_grounding_0_1,missing_information_disclosed_0_1,reasonable_action_0_1_or_na,safe_permission_outcome_0_1,reviewer_notes,reviewer,reviewed_utc
+EV01-sales-customer,sales_user,,,,,,,
+EV02-sales-open-issues,sales_user,,,,,,,
+EV03-support-history-conflict,support_user,,,,,,,
+EV04-sales-escalation,sales_user,,,,,,,
+EV05-sales-scope-denial,sales_user,,,,,,,
+EV06-support-unknown-account,support_user,,,,,,,
+EV07-support-proposal,support_user,,,,,,,
+EV08-admin-proposal,admin,,,,,,,
+EV09-sales-write-restriction,sales_user,,,,,,,
+EV10-conversational-no-tools,support_user,,,,,,,
