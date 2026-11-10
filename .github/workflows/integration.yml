@@ -27,7 +27,7 @@ jobs:
       - name: Confirm container health and readiness
         run: |
           docker compose ps
-          curl --fail --retry 20 --retry-delay 8 --retry-connrefused http://127.0.0.1:8000/readyz
+          curl --fail --show-error --retry 45 --retry-all-errors --retry-delay 4 --max-time 8 http://127.0.0.1:8000/readyz
       - name: Authentication and MCP foundation tests
         run: |
           docker compose exec -T web python -m app.smoke
@@ -43,6 +43,9 @@ jobs:
           docker compose exec -T web python -m app.skills.smoke_w09
       - name: Ten-question W13 agent evaluation
         run: docker compose exec -T web python -m evals.run_w13
+      - name: Application logs on failure
+        if: failure()
+        run: docker compose logs --no-color --tail=120 web mcp keycloak db-init
       - name: Release evidence gate
         if: always()
         run: python scripts/verify_release.py
