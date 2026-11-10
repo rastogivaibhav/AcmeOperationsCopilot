@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import operator
+import re
 import time
 from dataclasses import dataclass
 from typing import Annotated, Any, TypedDict
@@ -16,6 +17,8 @@ from app.agent.blueprint import Blueprint, agent_specs_for_profile
 from app.telemetry.tracing import tracer
 from app.actions import PROPOSAL_TOOL_SPECS, proposal_from_model
 from app.agent.tool_probe import MAX_RESULT_CHARS, validated_arguments
+from app.agent.evidence import (bind_customer_argument, bind_issue_argument,
+                                trusted_identifiers, redact_unverified_identifiers)
 from app.skills.escalation import (
     SKILL_NAME, AuditedReadOnlyMCP, run_customer_escalation_summary,
 )
@@ -50,6 +53,16 @@ async def reason_and_select(state: AgentState, runtime: Any) -> dict:
     if turns >= MAX_TURNS:
         return {"status": "failed", "answer": "Model turn budget exceeded"}
     messages = list(state.get("messages", []))
+    # Deny clear unauthorised write-only requests before model/tool invocation.
+    if turns == 0 and ctx.blueprint.role == "sales_user":
+        user_text = next((str(m.get("content") or "") for m in reversed(messages)
+                          if m.get("role") == "user"), "")
+        if re.match(r"^\s*(?:please\s+)?(?:close|update|resolve|delete|change)\s+issue\b",
+                    user_text, re.I):
+            answer = ("Your sales_user role is read-only and cannot update or close issues. "
+                      "No changes were made. Ask an authorised support user to review the issue.")
+            return {"messages": [{"role": "assistant", "content": answer}],
+                    "model_turns": turns + 1, "status": "complete", "answer": answer}
     if sum(len(json.dumps(m, ensure_ascii=False, default=str)) for m in messages) > MAX_CONTEXT_CHARS:
         return {"status": "failed", "answer": "Conversation context exceeds bounded model input"}
     response = await ctx.model.chat(
@@ -73,8 +86,12 @@ async def reason_and_select(state: AgentState, runtime: Any) -> dict:
     if not assistant["content"].strip():
         return {"model_turns": turns + 1, "status": "failed",
                 "answer": "Model produced no answer"}
+    # Filter generated identifiers not present in the user's request or
+    # authenticated source records; only MCP evidence can ground identifiers.
+    cleaned, _ = redact_unverified_identifiers(assistant["content"], messages)
+    assistant["content"] = cleaned
     return {"messages": [assistant], "model_turns": turns + 1,
-            "status": "complete", "answer": assistant["content"]}
+            "status": "complete", "answer": cleaned}
 
 
 def route_after_model(state: AgentState) -> str:
@@ -99,24 +116,45 @@ async def execute_selected_tools(state: AgentState, runtime: Any) -> dict:
             raise ValueError("INVALID_MODEL_TOOL_CALL")
         name = fn["name"]
         args = validated_arguments(name, fn.get("arguments", {}), ctx.tool_definitions)
+        args, customer_binding = bind_customer_argument(name, args, state.get("messages", []))
+        args, issue_binding = bind_issue_argument(name, args, state.get("messages", []))
+        binding = customer_binding or issue_binding
         started = time.perf_counter()
         nested_events = []
-        with tracer().start_as_current_span("agent.tool", attributes={"gen_ai.tool.name": name}):
-            if name in PROPOSAL_TOOL_SPECS:
-                if name not in ctx.blueprint.action_requests:
-                    raise ValueError("ACTION_PROPOSAL_NOT_ALLOWED")
-                proposal = proposal_from_model(name, args, ctx.blueprint.role)
-                proposals.append(proposal)
-                payload = {"status": "approval_required", "data": {"proposal": proposal},
-                           "evidence_refs": [], "error_code": None}
-            elif name == SKILL_NAME:
-                if name not in ctx.blueprint.skills:
-                    raise ValueError("SKILL_NOT_ALLOWED")
-                scoped_mcp = AuditedReadOnlyMCP(ctx.mcp)
-                payload = await run_customer_escalation_summary(scoped_mcp, **args)
-                nested_events = scoped_mcp.events
-            else:
-                payload = await ctx.mcp.call_tool(name, args)
+        if binding and not binding.startswith("BOUND_FROM_"):
+            payload = {"status": "validation_error", "data": None,
+                       "error_code": binding, "evidence_refs": []}
+        else:
+            with tracer().start_as_current_span("agent.tool", attributes={"gen_ai.tool.name": name}):
+                try:
+                    if name in PROPOSAL_TOOL_SPECS:
+                        if name not in ctx.blueprint.action_requests:
+                            raise ValueError("ACTION_PROPOSAL_NOT_ALLOWED")
+                        proposal = proposal_from_model(name, args, ctx.blueprint.role)
+                        proposals.append(proposal)
+                        payload = {"status": "approval_required", "data": {"proposal": proposal},
+                                   "evidence_refs": [], "error_code": None}
+                    elif name == SKILL_NAME:
+                        if name not in ctx.blueprint.skills:
+                            raise ValueError("SKILL_NOT_ALLOWED")
+                        scoped_mcp = AuditedReadOnlyMCP(ctx.mcp)
+                        payload = await run_customer_escalation_summary(scoped_mcp, **args)
+                        nested_events = scoped_mcp.events
+                    else:
+                        payload = await ctx.mcp.call_tool(name, args)
+                except ValueError as exc:
+                    if name not in PROPOSAL_TOOL_SPECS and name != SKILL_NAME:
+                        raise
+                    if str(exc) in {"ACTION_PROPOSAL_NOT_ALLOWED", "SKILL_NOT_ALLOWED"}:
+                        raise
+                    payload = {"status": "validation_error", "data": None,
+                               "error_code": "INVALID_MODEL_TOOL_INPUT", "evidence_refs": []}
+                except Exception as exc:
+                    from pydantic import ValidationError
+                    if not (name in PROPOSAL_TOOL_SPECS and isinstance(exc, ValidationError)):
+                        raise
+                    payload = {"status": "validation_error", "data": None,
+                               "error_code": "INVALID_MODEL_PROPOSAL", "evidence_refs": []}
         latency_ms = round((time.perf_counter() - started) * 1000)
         if not isinstance(payload, dict) or not isinstance(payload.get("status"), str):
             raise ValueError("INVALID_MCP_RESULT")
@@ -125,9 +163,19 @@ async def execute_selected_tools(state: AgentState, runtime: Any) -> dict:
             raise ValueError("INVALID_EVIDENCE_REFS")
         content = json.dumps(payload, ensure_ascii=False, default=str)
         if len(content) > MAX_RESULT_CHARS:
-            raise ValueError("MCP_RESULT_TOO_LARGE")
+            if name == SKILL_NAME and payload.get("status") == "ok":
+                summary = payload.get("data") or {}
+                condensed = {"status": "ok", "evidence_refs": refs,
+                             "data": {key: summary.get(key) for key in (
+                                 "risk_level", "risk_reasons", "executive_summary",
+                                 "recommended_actions", "missing_information",
+                                 "customer_id", "advisory_only")}}
+                content = json.dumps(condensed, ensure_ascii=False, default=str)
+            if len(content) > MAX_RESULT_CHARS:
+                raise ValueError("MCP_RESULT_TOO_LARGE")
         events.append({"name": name, "status": payload["status"],
                        "evidence_refs": refs, "duration_ms": latency_ms,
+                       "argument_resolution": binding if binding and binding.startswith("BOUND_FROM_") else None,
                        "error_code": payload.get("error_code")})
         events.extend(nested_events)
         for ref in refs:
@@ -178,8 +226,13 @@ async def execute_turn(graph: Any, conversation_id: str, message: str,
     answer = str(result.get("answer") or "")
     if result.get("proposed_actions"):
         answer = "PROPOSAL ONLY — no business record has been changed. Review and confirm below.\n\n" + answer
+    # Append only actual source record identifiers; not model-generated citations.
+    refs = result.get("evidence_refs") or []
+    if refs and status == "complete":
+        answer += "\n\nRetrieved records: " + ", ".join(refs[:24])
     return {"status": status, "answer": answer,
-            "evidence_refs": result.get("evidence_refs") or [],
+            "grounded_identifiers": sorted(trusted_identifiers(result.get("messages") or [])),
+            "evidence_refs": refs,
             "tool_events": result.get("tool_events") or [],
             "proposed_actions": result.get("proposed_actions") or [],
             "blueprint_version": blueprint.version,
