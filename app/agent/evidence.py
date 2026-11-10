@@ -91,7 +91,9 @@ def bind_issue_argument(name: str, arguments: dict, messages: list[dict]) -> tup
                     ids.add(found)
     value = _uuid(arguments.get("issue_id"))
     if value:
-        return (arguments, "ISSUE_ID_MISMATCH_WITH_VERIFIED_HISTORY") if ids and value not in ids else (arguments, None)
+        if not ids:
+            return arguments, "VERIFIED_ISSUE_HISTORY_REQUIRED"
+        return (arguments, "ISSUE_ID_MISMATCH_WITH_VERIFIED_HISTORY") if value not in ids else (arguments, None)
     if len(ids) == 1:
         updated = dict(arguments)
         updated["issue_id"] = next(iter(ids))
