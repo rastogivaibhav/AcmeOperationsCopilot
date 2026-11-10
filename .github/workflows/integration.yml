@@ -8,6 +8,10 @@ on:
       - 'compose.yaml'
       - 'database/init_keycloak.py'
       - 'infrastructure/keycloak/acme-realm.json'
+      - 'app/agent/**'
+      - 'app/skills/**'
+      - 'evals/**'
+      - 'tests/test_agent_grounding_recovery.py'
 permissions:
   contents: read
 jobs:
