@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from app.agent.evidence import bind_customer_argument
+from app.agent.intent import task_guidance, bind_explicit_issue, reject_unrelated_lookup
 
 READ_TOOLS = frozenset({"find_customer", "list_open_issues", "get_issue_history"})
 MAX_TURNS = 6
@@ -130,6 +131,9 @@ async def run_probe(query: str, model: ModelTransport, mcp: MCPTransport,
     definitions = allowed_tool_definitions(await mcp.list_tools())
     messages = [{"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": query}]
+    hint = task_guidance(messages)
+    if hint:
+        messages[0]["content"] += "\nTask-specific tool guidance: " + hint
     try:
         for _ in range(max_turns):
             response = await model.chat(messages, definitions)
@@ -157,7 +161,21 @@ async def run_probe(query: str, model: ModelTransport, mcp: MCPTransport,
                 if not isinstance(fn, dict) or not isinstance(fn.get("name"), str):
                     raise ValueError("INVALID_TOOL_CALL")
                 name = fn["name"]
-                args = validated_arguments(name, fn.get("arguments", {}), definitions)
+                code = reject_unrelated_lookup(name, messages)
+                raw_args, issue_binding = bind_explicit_issue(
+                    name, fn.get("arguments", {}), messages)
+                if not code and issue_binding and not issue_binding.startswith("BOUND_FROM_"):
+                    code = issue_binding
+                if code:
+                    payload = {"status": "validation_error", "data": None,
+                               "error_code": code, "evidence_refs": []}
+                    result.events.append(ToolEvent(name=name, arguments={},
+                        status="validation_error", evidence_refs=[], duration_ms=0,
+                        error_code=code))
+                    messages.append({"role": "tool", "tool_name": name,
+                                     "content": json.dumps(payload)})
+                    continue
+                args = validated_arguments(name, raw_args, definitions)
                 args, binding = bind_customer_argument(name, args, messages)
                 if binding and binding != "BOUND_FROM_VERIFIED_CUSTOMER_LOOKUP":
                     payload = {"status": "validation_error", "data": None,

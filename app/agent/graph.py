@@ -17,6 +17,7 @@ from app.agent.blueprint import Blueprint, agent_specs_for_profile
 from app.telemetry.tracing import tracer
 from app.actions import PROPOSAL_TOOL_SPECS, proposal_from_model
 from app.agent.tool_probe import MAX_RESULT_CHARS, validated_arguments
+from app.agent.intent import task_guidance, bind_explicit_issue, reject_unrelated_lookup
 from app.agent.evidence import (bind_customer_argument, bind_issue_argument,
                                 trusted_identifiers, redact_unverified_identifiers)
 from app.skills.escalation import (
@@ -65,8 +66,10 @@ async def reason_and_select(state: AgentState, runtime: Any) -> dict:
                     "model_turns": turns + 1, "status": "complete", "answer": answer}
     if sum(len(json.dumps(m, ensure_ascii=False, default=str)) for m in messages) > MAX_CONTEXT_CHARS:
         return {"status": "failed", "answer": "Conversation context exceeds bounded model input"}
+    hint = task_guidance(messages)
     response = await ctx.model.chat(
-        [{"role": "system", "content": ctx.blueprint.system_prompt}, *messages],
+        [{"role": "system", "content": ctx.blueprint.system_prompt +
+          ("\nTask-specific tool guidance: " + hint if hint else "")}, *messages],
         ctx.tool_definitions,
     )
     message = response.get("message")
@@ -115,8 +118,21 @@ async def execute_selected_tools(state: AgentState, runtime: Any) -> dict:
         if not isinstance(fn, dict) or not isinstance(fn.get("name"), str):
             raise ValueError("INVALID_MODEL_TOOL_CALL")
         name = fn["name"]
+        # The classifier does not execute tools: it only rejects an unrelated
+        # customer lookup for a uniquely identified issue-history request.
+        guard = reject_unrelated_lookup(name, state.get("messages", []))
+        raw_args, explicit_issue_binding = bind_explicit_issue(
+            name, fn.get("arguments", {}), state.get("messages", []))
+        if guard or (explicit_issue_binding and not explicit_issue_binding.startswith("BOUND_FROM_")):
+            code = guard or explicit_issue_binding
+            feedback = {"status": "validation_error", "data": None,
+                        "error_code": code, "evidence_refs": []}
+            outputs.append({"role": "tool", "tool_name": name, "content": json.dumps(feedback)})
+            events.append({"name": name, "status": "validation_error",
+                           "evidence_refs": [], "duration_ms": 0, "error_code": code})
+            continue
         try:
-            args = validated_arguments(name, fn.get("arguments", {}), ctx.tool_definitions)
+            args = validated_arguments(name, raw_args, ctx.tool_definitions)
         except ValueError as exc:
             code = str(exc)
             recoverable = {"REQUIRED_ARGUMENT_MISSING", "INVALID_STRING_ARGUMENT",
@@ -136,7 +152,7 @@ async def execute_selected_tools(state: AgentState, runtime: Any) -> dict:
         current_evidence = [*state.get("messages", []), *outputs]
         args, customer_binding = bind_customer_argument(name, args, current_evidence)
         args, issue_binding = bind_issue_argument(name, args, current_evidence)
-        binding = customer_binding or issue_binding
+        binding = customer_binding or issue_binding or explicit_issue_binding
         started = time.perf_counter()
         nested_events = []
         if binding and not binding.startswith("BOUND_FROM_"):
