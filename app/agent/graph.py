@@ -10,6 +10,7 @@ import json
 import operator
 import re
 import time
+from datetime import datetime
 from dataclasses import dataclass
 from typing import Annotated, Any, TypedDict
 
@@ -48,6 +49,7 @@ class RunContext:
     model: Any
     mcp: Any
     tool_definitions: list[dict]
+    evaluation_clock: datetime | None = None  # fixed only by trusted test caller
 
 
 async def reason_and_select(state: AgentState, runtime: Any) -> dict:
@@ -204,7 +206,8 @@ async def execute_selected_tools(state: AgentState, runtime: Any) -> dict:
                         if name not in ctx.blueprint.skills:
                             raise ValueError("SKILL_NOT_ALLOWED")
                         scoped_mcp = AuditedReadOnlyMCP(ctx.mcp)
-                        payload = await run_customer_escalation_summary(scoped_mcp, **args)
+                        payload = await run_customer_escalation_summary(
+                            scoped_mcp, **args, now=ctx.evaluation_clock)
                         nested_events = scoped_mcp.events
                     else:
                         payload = await ctx.mcp.call_tool(name, args)
@@ -245,7 +248,7 @@ async def execute_selected_tools(state: AgentState, runtime: Any) -> dict:
         events.append({"name": name, "status": payload["status"],
                        "evidence_refs": refs, "duration_ms": latency_ms,
                        "argument_resolution": binding if binding and binding.startswith("BOUND_FROM_") else None,
-                       "error_code": payload.get("error_code")})
+                       "source": "model_selected", "error_code": payload.get("error_code")})
         for ref in refs:
             if ref not in evidence:
                 evidence.append(ref)
@@ -279,11 +282,12 @@ def graph_input(user_message: str) -> AgentState:
 
 
 async def execute_turn(graph: Any, conversation_id: str, message: str,
-                       blueprint: Blueprint, model: Any, mcp: Any) -> dict:
+                       blueprint: Blueprint, model: Any, mcp: Any,
+                       evaluation_clock: datetime | None = None) -> dict:
     """Owner checking belongs to the caller *before* invoking this graph thread."""
     specs = agent_specs_for_profile(await mcp.list_tools(), blueprint)
     context = RunContext(blueprint=blueprint, model=model, mcp=mcp,
-                         tool_definitions=specs)
+                         tool_definitions=specs, evaluation_clock=evaluation_clock)
     result = await graph.ainvoke(graph_input(message),
                                 config={"configurable": {"thread_id": "conv:" + conversation_id},
                                         "recursion_limit": 22},

@@ -57,6 +57,9 @@ async def evaluate(input_path: Path = INPUT, output_path: Path = OUTPUT) -> int:
     spec = json.loads(input_path.read_text(encoding="utf-8"))
     cases = spec["cases"]
     validate_cases(cases)
+    evaluation_clock = datetime.fromisoformat(spec["evaluation_as_of_utc"])
+    if evaluation_clock.tzinfo is None:
+        raise ValueError("EVALUATION_AS_OF_MUST_HAVE_TIMEZONE")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     case_timeout = int(os.getenv("W13_CASE_TIMEOUT_SECONDS", "150"))
     if not 30 <= case_timeout <= 240:
@@ -65,6 +68,7 @@ async def evaluate(input_path: Path = INPUT, output_path: Path = OUTPUT) -> int:
               "timestamp_utc": datetime.now(timezone.utc).isoformat(),
               "model": os.getenv("OLLAMA_MODEL", "qwen2.5:3b"),
               "live_runtime_verified": False, "case_timeout_seconds": case_timeout,
+              "evaluation_as_of_utc": evaluation_clock.isoformat(),
               "cases": [], "blockers": []}
     try:
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -88,7 +92,8 @@ async def evaluate(input_path: Path = INPUT, output_path: Path = OUTPUT) -> int:
                         async with AuthenticatedMCP(token) as mcp:
                             # New thread per case to avoid contaminating independent results.
                             observed = await execute_turn(graph, str(uuid.uuid4()), case["question"],
-                                                          load_blueprint(case["role"]), model, mcp)
+                                                          load_blueprint(case["role"]), model, mcp,
+                                                          evaluation_clock=evaluation_clock)
                             outcome = score_agent_case(case, observed)
                             record.update(outcome)
                             record["answer_excerpt"] = str(observed.get("answer") or "")[:2500]
