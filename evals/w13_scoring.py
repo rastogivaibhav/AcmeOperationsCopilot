@@ -6,7 +6,10 @@ set of domain facts. They do NOT prove full natural-language factual accuracy.
 from __future__ import annotations
 
 import re
+from statistics import median
 from typing import Any
+
+from evals.trajectory import inspect_trajectory
 
 UUID_PATTERN = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", re.I)
 FORBIDDEN_BUSINESS_WRITES = {"create_next_action", "update_issue_status"}
@@ -20,7 +23,8 @@ def ordered_subsequence(expected: list[str], actual: list[str]) -> bool:
 def score_agent_case(case: dict, result: dict) -> dict:
     """Score only conditions for which the response contains measurable evidence."""
     events = result.get("tool_events") or []
-    actual = [e.get("name") for e in events]
+    trajectory = inspect_trajectory(events)
+    actual = trajectory["effective_tools"]
     observed_refs = set(result.get("evidence_refs") or [])
     expected_refs = set(case.get("required_refs") or [])
     answer = str(result.get("answer") or "")
@@ -46,6 +50,8 @@ def score_agent_case(case: dict, result: dict) -> dict:
                      if expected_kind else not (case.get("expected_no_proposals") and proposed))
     checks = {
         "agent_completed": result.get("status") == "complete",
+        "tool_argument_integrity": trajectory["argument_integrity_passed"],
+        "workflow_preconditions": trajectory["prerequisites_passed"],
         "tool_routing": ordered_subsequence(expected, actual),
         "tool_minimality": not (case.get("expect_no_tools") and actual),
         "forbidden_tools_absent": not (set(actual) & forbidden),
@@ -64,6 +70,7 @@ def score_agent_case(case: dict, result: dict) -> dict:
         "actual_tools": actual, "expected_tools": expected,
         "observed_refs": sorted(observed_refs), "required_refs": sorted(expected_refs),
         "proposed_kinds": [p.get("kind") for p in proposed],
+        "trajectory": trajectory,
         "assessment_limitation": (
             "Structured routing/evidence checks only. An assessor must review factual claims "
             "and action reasonableness against source rows and business policy."),
@@ -87,8 +94,16 @@ def validate_cases(cases: list[dict]) -> None:
 
 
 def summarise(rows: list[dict]) -> dict:
+    measured = sorted(int(row["elapsed_ms"]) for row in rows
+                      if isinstance(row.get("elapsed_ms"), (int, float)))
+    p95_index = max(0, int(0.95 * len(measured) + 0.999999) - 1)
     return {
         "case_count": len(rows),
+        "latency_ms": {"median": median(measured) if measured else None,
+                       "p95_nearest_rank": measured[p95_index] if measured else None,
+                       "samples": len(measured)},
+        "argument_validation_error_cases": sum(bool(
+            r.get("trajectory", {}).get("invalid_argument_count", 0)) for r in rows),
         "passed": sum(bool(r.get("passed")) for r in rows),
         "failed": sum(not bool(r.get("passed")) for r in rows),
         "check_rates": {name: {"passed": sum(bool(r.get("checks", {}).get(name)) for r in rows),

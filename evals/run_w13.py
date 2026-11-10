@@ -39,7 +39,12 @@ def _report_markdown(report: dict) -> str:
                     f"{'PASS' if case.get('passed') else 'FAIL'} | "
                     f"{case.get('elapsed_ms', 0)} | {', '.join(failed) or '—'} |")
     summ = report.get("summary", {})
+    as_of = report.get("evaluation_as_of_utc")
+    if as_of:
+        rows.append(f"\n**Fixture/risk assessment clock:** {as_of}")
     rows.extend(["", f"**Automated structural passes:** {summ.get('passed',0)} / {summ.get('case_count',10)}",
+                 f"**Median case latency (ms):** {summ.get('latency_ms',{}).get('median')}",
+                 f"**P95 nearest-rank latency (ms):** {summ.get('latency_ms',{}).get('p95_nearest_rank')}",
                  "", "## Limitations and commentary", "",
                  "- A PASS validates the reported structure, expected tool sequence, some factual terms and observed evidence IDs. It does not prove semantic groundedness.",
                  "- Review every generated recommendation and claimed business fact against the supplied tool data, checking omitted context and potential hallucination.",
