@@ -40,7 +40,7 @@ def analyse_request(messages: list[dict]) -> RequestSignals:
         kind = "escalation"
     elif re.search(r"\b(?:history|conflict|provisional fix)\b",lower):
         kind = "history"
-    elif re.search(r"\b(?:open issues|issues currently open|currently open issues)\b",lower):
+    elif re.search(r"\b(?:open issues|issues (?:are )?currently open|currently open issues)\b",lower):
         kind = "customer_issues"
     elif re.search(r"\b(?:customer profile|account owner|look up (?:its|the) (?:customer|profile)|find (?:the )?customer)\b",lower):
         kind = "customer_lookup"
