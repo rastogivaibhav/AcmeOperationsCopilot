@@ -156,3 +156,41 @@ async def test_explicit_issue_history_binding_uses_user_uuid_not_guessed_id():
     result = await execute_selected_tools(state, ctx("support_user", mcp))
     assert mcp.calls == [("get_issue_history", {"issue_id": ISSUE})]
     assert result["tool_events"][-1]["argument_resolution"] == "BOUND_FROM_EXPLICIT_USER_ISSUE"
+
+
+def test_general_definition_does_not_become_escalation_tool_request():
+    messages = [{"role": "user", "content":
+                 "In one sentence, define customer escalation in general. Do not access customer records."}]
+    assert analyse_request(messages).purpose == "general"
+    assert "no customer tools" in task_guidance(messages)
+
+
+def test_tool_trajectory_distinguishes_model_choice_from_dependencies():
+    from evals.trajectory import inspect_trajectory
+    events = [
+        {"name": "get_issue_history", "status": "ok",
+         "source": "policy_precondition"},
+        {"name": "request_next_action", "status": "approval_required",
+         "source": "model_selected"},
+    ]
+    result = inspect_trajectory(events)
+    assert result["model_selected_tools"] == ["request_next_action"]
+    assert result["policy_preconditions"] == ["get_issue_history"]
+    assert result["argument_integrity_passed"]
+    assert result["prerequisites_passed"]
+    assert not inspect_trajectory(events[1:])["prerequisites_passed"]
+    assert not inspect_trajectory([{"name": "list_open_issues",
+                                   "status": "validation_error"}])["argument_integrity_passed"]
+
+
+def test_business_fixture_guard_refuses_drift_without_looking_at_secret_rows(monkeypatch, tmp_path):
+    from evals import fixture_guard
+    baseline = tmp_path / "fixture-baseline.json"
+    clean = {"sha256": "1234", "counts": dict(fixture_guard.EXPECTED_COUNTS),
+             "mode": "read_only_business_fixture"}
+    monkeypatch.setattr(fixture_guard, "fingerprint", lambda: clean)
+    assert fixture_guard.check("capture", baseline)
+    assert fixture_guard.check("verify", baseline)
+    monkeypatch.setattr(fixture_guard, "fingerprint",
+                        lambda: {**clean, "sha256": "different"})
+    assert not fixture_guard.check("verify", baseline)
