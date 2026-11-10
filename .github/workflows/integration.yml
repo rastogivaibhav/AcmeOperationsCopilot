@@ -126,19 +126,21 @@ jobs:
       - name: Application logs on failure
         if: failure()
         run: docker compose logs --no-color --tail=120 web mcp keycloak db-init
-      - name: Release evidence gate
-        if: always()
-        run: python scripts/verify_release.py
       - name: Copy results from ephemeral containers
         if: always()
         continue-on-error: true
-        run: docker compose cp web:/code/evals/results ./live-results
+        run: |
+          mkdir -p evals/results
+          docker compose cp web:/code/evals/results/. ./evals/results/
+      - name: Verify actual submission evidence
+        if: always()
+        run: python scripts/verify_release.py --submission
       - name: Upload evaluation reports (no credentials)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: acme-live-evaluation
-          path: live-results/
+          path: evals/results/
           if-no-files-found: ignore
       - name: Runtime service status
         if: always()
