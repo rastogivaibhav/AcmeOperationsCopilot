@@ -194,3 +194,16 @@ async def test_missing_required_skill_argument_is_model_feedback_not_exception()
     outcome = await execute_selected_tools(state, runtime("sales_user", mcp))
     assert outcome["tool_events"][0]["error_code"] == "REQUIRED_ARGUMENT_MISSING"
     assert mcp.calls == []
+
+
+@pytest.mark.asyncio
+async def test_same_batch_find_then_issues_uses_first_authenticated_tool_result():
+    mcp = FakeMCP()
+    state = graph_input("Find Acme Retail and show its open issues")
+    state["messages"].append({"role": "assistant", "tool_calls": [
+        call("find_customer", customer_name="Acme Retail"),
+        call("list_open_issues", customer_id="<customer_id>")]})
+    result = await execute_selected_tools(state, runtime("sales_user", mcp))
+    assert [name for name, _ in mcp.calls] == ["find_customer", "list_open_issues"]
+    assert mcp.calls[1][1]["customer_id"] == CUSTOMER
+    assert "issues:" + ISSUE in result["evidence_refs"]
