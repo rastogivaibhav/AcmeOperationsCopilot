@@ -36,10 +36,12 @@ async def main():
         assert cid not in str(other_list.json()), other_list.text
         noauth = await client.get(f"{WEB}/api/conversations")
         assert noauth.status_code == 401, noauth.text
-        # The message endpoint is deliberately not simulated until W08.
-        pending = await client.post(f"{WEB}/api/conversations/{cid}/messages",
-                                    headers={"Authorization": f"Bearer {alice}"}, json={"message": "Hi"})
-        assert pending.status_code == 501, pending.text
+        # W08 now implements real agent chat. Verify ownership without initiating
+        # an expensive Ollama inference from this identity-only smoke test.
+        outsider_post = await client.post(f"{WEB}/api/conversations/{cid}/messages",
+                                         headers={"Authorization": f"Bearer {bob}"},
+                                         json={"message": "Hi"})
+        assert outsider_post.status_code == 404, outsider_post.text
     print("LIVE_W06_OWNERSHIP_SMOKE_PASS")
 
 

@@ -28,6 +28,29 @@ jobs:
         run: |
           docker compose ps
           curl --fail --show-error --retry 45 --retry-all-errors --retry-delay 4 --max-time 8 http://127.0.0.1:8000/readyz
+      - name: Inspect JWT validation metadata (never emit tokens)
+        run: |
+          docker compose exec -T web python - <<'PY'
+          import os
+          import jwt
+          from app.smoke import acquire
+          from acme_shared.security import verify_keycloak_jwt
+          from acme_shared.policies import effective_role, principal_from_claims
+          token = acquire("sales-demo", "SalesLocal2026!")
+          untrusted = jwt.decode(token, options={"verify_signature": False})
+          print("JWT_METADATA", {
+              "iss": untrusted.get("iss"),
+              "aud": untrusted.get("aud"),
+              "realm_role_names": untrusted.get("realm_access", {}).get("roles", []),
+              "has_kid": bool(jwt.get_unverified_header(token).get("kid")),
+              "expected_issuer": os.environ.get("KEYCLOAK_ISSUER"),
+          })
+          try:
+              verified = verify_keycloak_jwt(token, audience="acme-web")
+              print("JWT_VERIFIED_ROLE", effective_role(principal_from_claims(verified)))
+          except Exception as exc:
+              print("JWT_VALIDATION_ERROR", type(exc).__name__, str(exc))
+          PY
       - name: Authentication and MCP foundation tests
         run: |
           docker compose exec -T web python -m app.smoke
