@@ -10,6 +10,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from app.agent.evidence import bind_customer_argument
+
 READ_TOOLS = frozenset({"find_customer", "list_open_issues", "get_issue_history"})
 MAX_TURNS = 6
 MAX_CALLS = 8
@@ -153,6 +155,16 @@ async def run_probe(query: str, model: ModelTransport, mcp: MCPTransport,
                     raise ValueError("INVALID_TOOL_CALL")
                 name = fn["name"]
                 args = validated_arguments(name, fn.get("arguments", {}), definitions)
+                args, binding = bind_customer_argument(name, args, messages)
+                if binding and binding != "BOUND_FROM_VERIFIED_CUSTOMER_LOOKUP":
+                    payload = {"status": "validation_error", "data": None,
+                               "error_code": binding, "evidence_refs": []}
+                    result.events.append(ToolEvent(name=name, arguments=args,
+                                                   status="validation_error", evidence_refs=[],
+                                                   duration_ms=0, error_code=binding))
+                    messages.append({"role": "tool", "tool_name": name,
+                                     "content": json.dumps(payload)})
+                    continue
                 tool_start = time.perf_counter()
                 payload = await mcp.call_tool(name, args)
                 elapsed = round((time.perf_counter() - tool_start) * 1000)
