@@ -42,6 +42,10 @@ async def resolve_proposal(name: str, raw_args: Any, messages: list[dict],
     if name not in PROPOSALS or not isinstance(raw_args, dict):
         return raw_args, [], [], None
     args = dict(raw_args)
+    allowed = ({"issue_id", "description"} if name == "request_next_action"
+               else {"issue_id", "new_status", "expected_version", "note"})
+    if set(args) - allowed:
+        return args, [], [], "UNEXPECTED_ARGUMENT"
     known = analyse_request(messages).issue_id
     given = _uuid(args.get("issue_id"))
     if known and given and known != given:
