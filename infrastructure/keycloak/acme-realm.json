@@ -50,9 +50,9 @@
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.client.audience": "acme-mcp",
             "access.token.claim": "true",
-            "id.token.claim": "false"
+            "id.token.claim": "false",
+            "included.custom.audience": "acme-mcp"
           }
         },
         {
@@ -64,6 +64,16 @@
             "included.client.audience": "acme-web",
             "access.token.claim": "true",
             "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "acme-access-token-subject",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "consentRequired": false,
+          "config": {
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
           }
         }
       ],

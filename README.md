@@ -23,6 +23,8 @@ flowchart LR
 
 Keycloak stores its realm/users in the separate `keycloak` PostgreSQL schema, created idempotently by `db-init`. This replaces the H2 Docker-volume mount that failed in GitHub Actions. The demo shares a PostgreSQL instance with business data but keeps identity tables in a distinct schema; production should also use separate database credentials and hardened Keycloak configuration.
 
+For Keycloak 26.8, the imported `acme-web` client explicitly adds the `oidc-sub-mapper` access-token subject claim and a **custom** `acme-mcp` audience. A client audience mapper pointing to a non-existent client is ignored by this version; both `sub` and `aud=acme-mcp` are required by the server-side JWT verifiers.
+
 Keycloak runs in `start-dev` and demo passwords are intentionally disposable. The MCP server independently validates a Keycloak token with the `acme-mcp` audience. The web API independently validates it with the `acme-web` audience. The demo web client includes both audiences in its access tokens, an acceptable local simplification that **must not be reused unchanged** in production; a production implementation should use properly scoped delegation/token exchange.
 
 ## Requirements

@@ -15,8 +15,17 @@ def test_realm_has_business_roles_and_distinct_users():
     assert all(len(u.get("realmRoles", [])) == 1 for u in realm["users"])
     client = next(c for c in realm["clients"] if c["clientId"] == "acme-web")
     assert client["standardFlowEnabled"]
-    audiences = [m["config"]["included.client.audience"] for m in client["protocolMappers"]]
+    audience_mappers = [m for m in client["protocolMappers"]
+                        if m["protocolMapper"] == "oidc-audience-mapper"]
+    audiences = {m["config"].get("included.client.audience")
+                 or m["config"].get("included.custom.audience")
+                 for m in audience_mappers}
     assert "acme-web" in audiences and "acme-mcp" in audiences
+    assert any(m["config"].get("included.custom.audience") == "acme-mcp"
+               for m in audience_mappers)
+    assert any(m["protocolMapper"] == "oidc-sub-mapper"
+               and m["config"].get("access.token.claim") == "true"
+               for m in client["protocolMappers"])
 
 
 def test_seed_dataset_and_idempotent_inserts():
