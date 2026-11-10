@@ -183,3 +183,14 @@ async def test_w07_model_selected_tool_binds_placeholder():
     assert mcp.calls[1][1]["customer_id"] == CUSTOMER
     assert score_probe(result, ["find_customer", "list_open_issues"],
                        required_evidence_refs=["issues:" + ISSUE])["passed"]
+
+
+@pytest.mark.asyncio
+async def test_missing_required_skill_argument_is_model_feedback_not_exception():
+    mcp = FakeMCP()
+    state = graph_input("Assess risk")
+    state["messages"].append({"role": "assistant", "tool_calls": [
+        call("customer_escalation_summary")]})
+    outcome = await execute_selected_tools(state, runtime("sales_user", mcp))
+    assert outcome["tool_events"][0]["error_code"] == "REQUIRED_ARGUMENT_MISSING"
+    assert mcp.calls == []
