@@ -1,0 +1,158 @@
+"""NVIDIA-inspired typed request and governed workflow regression tests.
+
+No model responses or live MCP outcomes are claimed by these unit tests.
+"""
+from types import SimpleNamespace
+import pytest
+
+from app.agent.intent import (analyse_request, task_guidance, bind_explicit_issue,
+                              reject_unrelated_lookup)
+from app.agent.graph import (RunContext, execute_selected_tools, graph_input)
+from app.agent.blueprint import load_blueprint, agent_specs_for_profile
+from app.skills.escalation import run_customer_escalation_summary, SKILL_NAME
+from tests.test_w08_blueprints import TOOL_DEFINITIONS
+from tests.test_w09_escalation_skill import FakeMCP as SkillMCP, issue, NOW, CUSTOMER_ID
+
+ISSUE = "ab000000-0000-4000-8000-000000000001"
+
+
+def call(name, **args):
+    return {"function": {"name": name, "arguments": args}}
+
+
+def ctx(role, mcp):
+    bp = load_blueprint(role)
+    return SimpleNamespace(context=RunContext(bp, None, mcp,
+        agent_specs_for_profile(TOOL_DEFINITIONS, bp)))
+
+
+class HistoryMCP:
+    def __init__(self, status="ok", version=3):
+        self.status, self.version = status, version
+        self.calls = []
+
+    async def call_tool(self, name, args):
+        self.calls.append((name, args))
+        assert name == "get_issue_history"  # Proposal preconditions are read-only.
+        if self.status != "ok":
+            return {"status": self.status, "data": None, "evidence_refs": []}
+        return {"status": "ok", "data": {
+            "issue": {"id": ISSUE, "status": "investigating", "version": self.version},
+            "updates": []}, "evidence_refs": ["issues:" + ISSUE]}
+
+
+def test_typed_issue_signals_are_not_fixture_specific():
+    custom = "123e4567-e89b-42d3-a456-426614174000"
+    msgs = [{"role": "user", "content": f"Summarize history for issue {custom}."}]
+    assert analyse_request(msgs).issue_id == custom
+    assert analyse_request(msgs).purpose == "history"
+    assert custom in task_guidance(msgs)
+    assert reject_unrelated_lookup("find_customer", msgs) is not None
+    args, tag = bind_explicit_issue("get_issue_history", {"issue_id": "placeholder"}, msgs)
+    assert args["issue_id"] == custom and tag == "BOUND_FROM_EXPLICIT_USER_ISSUE"
+
+
+def test_never_bind_multiple_or_mismatched_issue_identifiers():
+    first, other = ISSUE, "ab000000-0000-4000-8000-000000000099"
+    msgs = [{"role": "user", "content": f"Compare issues {first} and {other}"}]
+    assert analyse_request(msgs).issue_id is None
+    assert bind_explicit_issue("get_issue_history", {"issue_id": "bad"}, msgs)[1] is None
+    one = [{"role": "user", "content": f"Inspect issue {first}"}]
+    assert bind_explicit_issue("get_issue_history", {"issue_id": other}, one)[1] == \
+        "ISSUE_ID_MISMATCH_WITH_USER_REFERENCE"
+
+
+@pytest.mark.asyncio
+async def test_skill_resolves_name_through_authenticated_mcp_without_bypassing_scope():
+    mcp = SkillMCP([issue()])
+    result = await run_customer_escalation_summary(mcp, customer_name="Acme Retail", now=NOW)
+    assert result["status"] == "ok"
+    assert result["data"]["risk_level"] == "Critical"
+    assert [name for name, _ in mcp.calls] == [
+        "find_customer", "list_open_issues", "get_issue_history"]
+    assert result["data"]["advisory_only"] is True
+
+
+@pytest.mark.asyncio
+async def test_name_resolution_denial_does_not_disclose_issue_data():
+    mcp = SkillMCP([issue()], errors={"find_customer": "forbidden"})
+    result = await run_customer_escalation_summary(mcp, customer_name="Restricted", now=NOW)
+    assert result["status"] == "unavailable"
+    assert result["evidence_refs"] == []
+    assert [name for name, _ in mcp.calls] == ["find_customer"]
+
+
+@pytest.mark.asyncio
+async def test_model_selected_named_skill_records_dependency_trajectory():
+    mcp = SkillMCP([issue()])
+    state = graph_input("Assess the escalation risk for Acme Retail")
+    state["messages"].append({"role": "assistant", "tool_calls": [
+        call(SKILL_NAME, customer_name="Acme Retail")]})
+    response = await execute_selected_tools(state, ctx("sales_user", mcp))
+    assert [e["name"] for e in response["tool_events"]] == [
+        "find_customer", "list_open_issues", "get_issue_history", SKILL_NAME]
+    assert response["tool_events"][-1]["status"] == "ok"
+    assert "issues:" + ISSUE in response["evidence_refs"]
+
+
+@pytest.mark.asyncio
+async def test_proposal_auto_fetches_authorised_history_and_binds_current_version():
+    mcp = HistoryMCP()
+    state = graph_input(f"Inspect issue {ISSUE} and propose changing status to open.")
+    state["messages"].append({"role": "assistant", "tool_calls": [
+        call("request_issue_update", issue_id=ISSUE, new_status="open",
+             note="Confirm reconciliation") ]})
+    result = await execute_selected_tools(state, ctx("support_user", mcp))
+    assert mcp.calls == [("get_issue_history", {"issue_id": ISSUE})]
+    assert [e["name"] for e in result["tool_events"]] == [
+        "get_issue_history", "request_issue_update"]
+    assert result["tool_events"][0]["source"] == "policy_precondition"
+    assert result["tool_events"][1]["status"] == "approval_required"
+    assert result["proposed_actions"][0]["expected_version"] == 3
+    assert "issues:" + ISSUE in result["evidence_refs"]
+
+
+@pytest.mark.asyncio
+async def test_reject_stale_version_before_creating_model_proposal():
+    mcp = HistoryMCP(version=4)
+    state = graph_input(f"For issue {ISSUE} propose a status change.")
+    state["messages"].append({"role": "assistant", "tool_calls": [
+        call("request_issue_update", issue_id=ISSUE, new_status="open",
+             expected_version=2, note="Check source")]})
+    result = await execute_selected_tools(state, ctx("support_user", mcp))
+    assert result["proposed_actions"] == []
+    assert result["tool_events"][-1]["error_code"] == "STALE_PROPOSAL_ISSUE_VERSION"
+
+
+@pytest.mark.asyncio
+async def test_denied_history_never_generates_proposal():
+    mcp = HistoryMCP(status="forbidden")
+    state = graph_input(f"Create an action for issue {ISSUE}")
+    state["messages"].append({"role": "assistant", "tool_calls": [
+        call("request_next_action", issue_id=ISSUE, description="Contact owner")]})
+    result = await execute_selected_tools(state, ctx("admin", mcp))
+    assert result["proposed_actions"] == []
+    assert result["tool_events"][-1]["error_code"] == "VERIFIED_ISSUE_HISTORY_REQUIRED"
+
+
+@pytest.mark.asyncio
+async def test_forged_approval_argument_does_not_trigger_lookup_or_proposal():
+    mcp = HistoryMCP()
+    state = graph_input(f"Create an action for issue {ISSUE}")
+    state["messages"].append({"role": "assistant", "tool_calls": [
+        call("request_next_action", issue_id=ISSUE, description="Call owner",
+             approval_id="attacker-controlled")]})
+    result = await execute_selected_tools(state, ctx("admin", mcp))
+    assert result["tool_events"][-1]["error_code"] == "UNEXPECTED_ARGUMENT"
+    assert result["proposed_actions"] == [] and not mcp.calls
+
+
+@pytest.mark.asyncio
+async def test_explicit_issue_history_binding_uses_user_uuid_not_guessed_id():
+    mcp = HistoryMCP()
+    state = graph_input(f"Read the history for issue {ISSUE}")
+    state["messages"].append({"role": "assistant", "tool_calls": [
+        call("get_issue_history", issue_id="invented")]})
+    result = await execute_selected_tools(state, ctx("support_user", mcp))
+    assert mcp.calls == [("get_issue_history", {"issue_id": ISSUE})]
+    assert result["tool_events"][-1]["argument_resolution"] == "BOUND_FROM_EXPLICIT_USER_ISSUE"
