@@ -16,6 +16,7 @@ from typing import Annotated, Any, TypedDict
 from app.agent.blueprint import Blueprint, agent_specs_for_profile
 from app.telemetry.tracing import tracer
 from app.actions import PROPOSAL_TOOL_SPECS, proposal_from_model
+from app.agent.dependencies import resolve_proposal
 from app.agent.tool_probe import MAX_RESULT_CHARS, validated_arguments
 from app.agent.intent import (task_guidance, bind_explicit_issue,
                               reject_unrelated_lookup, explicit_customer_id)
@@ -132,6 +133,30 @@ async def execute_selected_tools(state: AgentState, runtime: Any) -> dict:
             events.append({"name": name, "status": "validation_error",
                            "evidence_refs": [], "duration_ms": 0, "error_code": code})
             continue
+        if name in PROPOSAL_TOOL_SPECS:
+            # Never retrieve a dependency for a tool absent from this role's
+            # authorised blueprint. An LLM cannot expand its own authority.
+            if name not in ctx.blueprint.action_requests:
+                raise ValueError("TOOL_NOT_ALLOWED")
+            model_specs = {item["function"]["name"] for item in ctx.tool_definitions}
+            if name not in model_specs:
+                raise ValueError("TOOL_NOT_ALLOWED")
+            raw_args, prerequisites, pre_events, pre_error = await resolve_proposal(
+                name, raw_args, [*state.get("messages", []), *outputs], ctx.mcp)
+            outputs.extend(prerequisites)
+            events.extend(pre_events)
+            for pre_event in pre_events:
+                for ref in pre_event.get("evidence_refs", []):
+                    if ref not in evidence:
+                        evidence.append(ref)
+            if pre_error:
+                feedback = {"status":"validation_error", "data":None,
+                            "error_code":pre_error, "evidence_refs":[]}
+                outputs.append({"role":"tool", "tool_name":name,
+                                "content":json.dumps(feedback)})
+                events.append({"name":name,"status":"validation_error",
+                               "evidence_refs":[],"duration_ms":0,"error_code":pre_error})
+                continue
         try:
             args = validated_arguments(name, raw_args, ctx.tool_definitions)
         except ValueError as exc:

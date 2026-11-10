@@ -69,8 +69,11 @@ async def resolve_proposal(name: str, raw_args: Any, messages: list[dict],
                             "evidence_refs":references, "duration_ms":round(
                                 (time.perf_counter()-started)*1000),
                             "source":"policy_precondition","error_code":response.get("error_code")})
+        content = json.dumps(response, default=str, ensure_ascii=False)
+        if len(content) > 14000:
+            return args, [], extra_events, "ISSUE_PRECONDITION_TOO_LARGE"
         extra_messages.append({"role":"tool", "tool_name":"get_issue_history",
-                               "content":json.dumps(response, default=str, ensure_ascii=False)})
+                               "content":content})
         history = _histories([*messages, *extra_messages])
         if response["status"] != "ok" or target not in history:
             return args, extra_messages, extra_events, "VERIFIED_ISSUE_HISTORY_REQUIRED"
