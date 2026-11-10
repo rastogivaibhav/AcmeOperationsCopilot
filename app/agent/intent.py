@@ -10,7 +10,7 @@ import re
 import uuid
 
 UUID_RE = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", re.I)
-Purpose = Literal["history", "proposal", "escalation", "customer_issues", "general", "other"]
+Purpose = Literal["history", "proposal", "escalation", "customer_issues", "customer_lookup", "general", "other"]
 
 
 @dataclass(frozen=True)
@@ -34,7 +34,7 @@ def analyse_request(messages: list[dict]) -> RequestSignals:
     # such as "escalation"; they should not invoke customer data tools.
     if re.search(r"\b(?:in general|define|explain what|do not access customer records)\b", lower):
         kind: Purpose = "general"
-    elif re.search(r"\b(?:propos(?:e|al)|update|change status|create (?:an? )?action)\b", lower):
+    elif re.search(r"\b(?:propos(?:e|al)|change status|(?:update|close|resolve|change) (?:the )?issue|create (?:an? )?action)\b", lower):
         kind = "proposal"
     elif re.search(r"\b(?:escalat(?:e|ion|ion summary)|risk assessment|assess customer risk)\b",lower):
         kind = "escalation"
@@ -42,8 +42,8 @@ def analyse_request(messages: list[dict]) -> RequestSignals:
         kind = "history"
     elif re.search(r"\b(?:open issues|issues currently open|currently open issues)\b",lower):
         kind = "customer_issues"
-    elif re.search(r"\b(?:in one sentence|in general|define|explain what)\b",lower):
-        kind = "general"
+    elif re.search(r"\b(?:customer profile|account owner|look up (?:its|the) (?:customer|profile)|find (?:the )?customer)\b",lower):
+        kind = "customer_lookup"
     else:
         kind = "other"
     return RequestSignals(kind, issue)
@@ -104,3 +104,29 @@ def reject_unrelated_lookup(name: str, messages: list[dict]) -> str | None:
             and not re.search(r"\b(?:customer named|customer called|customer profile for)\b",text)):
         return "ISSUE_REQUEST_REQUIRES_ISSUE_HISTORY"
     return None
+
+
+def tools_for_request(definitions: list[dict], messages: list[dict]) -> list[dict]:
+    """Typed task-specific visibility, always a SUBSET of caller's approved tools.
+
+    The model still selects tools. Unknown/ambiguous intents retain all tools.
+    Restrict only clearly typed requests; no hard-coded case IDs or answers.
+    """
+    signals = analyse_request(messages)
+    allowed: set[str] | None = None
+    if signals.purpose == "general":
+        allowed = set()
+    elif signals.purpose == "customer_lookup":
+        allowed = {"find_customer"}
+    elif signals.purpose == "customer_issues":
+        allowed = {"find_customer", "list_open_issues"}
+    elif signals.purpose == "history" and signals.issue_id:
+        allowed = {"get_issue_history"}
+    elif signals.purpose == "proposal" and signals.issue_id:
+        allowed = {"get_issue_history", "request_issue_update", "request_next_action"}
+    elif signals.purpose == "escalation":
+        allowed = {"find_customer", "customer_escalation_summary"}
+    if allowed is None:
+        return definitions
+    return [spec for spec in definitions
+            if spec.get("function", {}).get("name") in allowed]

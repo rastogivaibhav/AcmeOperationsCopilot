@@ -11,7 +11,8 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from app.agent.evidence import bind_customer_argument
-from app.agent.intent import task_guidance, bind_explicit_issue, reject_unrelated_lookup
+from app.agent.intent import (task_guidance, bind_explicit_issue,
+                              reject_unrelated_lookup, tools_for_request)
 
 READ_TOOLS = frozenset({"find_customer", "list_open_issues", "get_issue_history"})
 MAX_TURNS = 6
@@ -136,7 +137,7 @@ async def run_probe(query: str, model: ModelTransport, mcp: MCPTransport,
         messages[0]["content"] += "\nTask-specific tool guidance: " + hint
     try:
         for _ in range(max_turns):
-            response = await model.chat(messages, definitions)
+            response = await model.chat(messages, tools_for_request(definitions, messages))
             result.model_calls += 1
             result.model_metrics.append({k: response[k] for k in (
                 "model", "done_reason", "prompt_eval_count", "eval_count",

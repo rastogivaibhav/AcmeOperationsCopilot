@@ -20,7 +20,8 @@ from app.actions import PROPOSAL_TOOL_SPECS, proposal_from_model
 from app.agent.dependencies import resolve_proposal
 from app.agent.tool_probe import MAX_RESULT_CHARS, validated_arguments
 from app.agent.intent import (task_guidance, bind_explicit_issue,
-                              reject_unrelated_lookup, explicit_customer_id)
+                              reject_unrelated_lookup, explicit_customer_id,
+                              tools_for_request)
 from app.agent.evidence import (bind_customer_argument, bind_issue_argument,
                                 trusted_identifiers, redact_unverified_identifiers)
 from app.skills.escalation import (
@@ -74,7 +75,7 @@ async def reason_and_select(state: AgentState, runtime: Any) -> dict:
     response = await ctx.model.chat(
         [{"role": "system", "content": ctx.blueprint.system_prompt +
           ("\nTask-specific tool guidance: " + hint if hint else "")}, *messages],
-        ctx.tool_definitions,
+        tools_for_request(ctx.tool_definitions, messages),
     )
     message = response.get("message")
     if not isinstance(message, dict):
