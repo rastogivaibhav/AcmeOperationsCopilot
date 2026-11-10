@@ -30,8 +30,12 @@ def analyse_request(messages: list[dict]) -> RequestSignals:
     matches = tuple(dict.fromkeys(str(uuid.UUID(v)) for v in UUID_RE.findall(text)))
     # An issue reference is typed only if the user explicitly calls it an issue.
     issue = matches[0] if len(matches) == 1 and re.search(r"\bissue\b", lower) else None
-    if re.search(r"\b(?:propos(?:e|al)|update|change status|create (?:an? )?action)\b", lower):
-        kind: Purpose = "proposal"
+    # Explicitly general/definition questions take priority over domain terms
+    # such as "escalation"; they should not invoke customer data tools.
+    if re.search(r"\b(?:in general|define|explain what|do not access customer records)\b", lower):
+        kind: Purpose = "general"
+    elif re.search(r"\b(?:propos(?:e|al)|update|change status|create (?:an? )?action)\b", lower):
+        kind = "proposal"
     elif re.search(r"\b(?:escalat(?:e|ion|ion summary)|risk assessment|assess customer risk)\b",lower):
         kind = "escalation"
     elif re.search(r"\b(?:history|conflict|provisional fix)\b",lower):
