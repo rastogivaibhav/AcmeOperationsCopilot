@@ -63,7 +63,7 @@ def task_guidance(messages: list[dict]) -> str:
         hints.append("Read issue history, its current status and version before a proposal. "
                      "Proposal tools cannot commit changes.")
     if signals.purpose == "general":
-        hints.append("This is a general definition; avoid customer tools.")
+        hints.append("This is a general definition; use no customer tools.")
     return " ".join(hints)
 
 
