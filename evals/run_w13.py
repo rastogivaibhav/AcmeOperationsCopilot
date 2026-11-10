@@ -90,6 +90,14 @@ async def evaluate(input_path: Path = INPUT, output_path: Path = OUTPUT) -> int:
                 except Exception as exc:
                     # Only the class is persisted; external exception text may include secrets.
                     record["error_class"] = type(exc).__name__
+                    pending = list(getattr(exc, "exceptions", ()))
+                    nested_types = []
+                    while pending and len(nested_types) < 8:
+                        item = pending.pop(0)
+                        nested_types.append(type(item).__name__)
+                        pending.extend(getattr(item, "exceptions", ()))
+                    if nested_types:
+                        record["error_nested_types"] = nested_types
                 record["elapsed_ms"] = round((time.perf_counter() - started)*1000)
                 report["cases"].append(record)
                 print(f"W13_{'PASS' if record['passed'] else 'FAIL'} {case['id']} ({record['elapsed_ms']}ms)", flush=True)
