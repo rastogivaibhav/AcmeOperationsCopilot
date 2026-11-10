@@ -34,8 +34,8 @@ class FakeMCP:
         if name == "find_customer":
             if arguments["customer_name"] == "Northstar Finance":
                 return {"status": "not_found", "data": None, "evidence_refs": []}
-            return {"status": "ok", "data": {"id": "acme-001"},
-                    "evidence_refs": ["customers:acme-001"]}
+            return {"status": "ok", "data": {"id": "ac000000-0000-4000-8000-000000000001"},
+                    "evidence_refs": ["customers:ac000000-0000-4000-8000-000000000001"]}
         if name == "list_open_issues":
             return {"status": "ok", "data": [{"id": "issue-001"}],
                     "evidence_refs": ["issues:issue-001"]}
@@ -86,7 +86,7 @@ async def test_dynamic_chained_customer_and_issue_tool_calls():
     fake_mcp = FakeMCP()
     fake_llm = FakeModel([
         {"content": "", "tool_calls": [call("find_customer", customer_name="Acme Retail")]},
-        {"content": "", "tool_calls": [call("list_open_issues", customer_id="acme-001")]},
+        {"content": "", "tool_calls": [call("list_open_issues", customer_id="ac000000-0000-4000-8000-000000000001")]},
         {"content": "Found the open issue issue-001", "tool_calls": []},
     ])
     result = await run_probe("Which issues are open for Acme Retail?", fake_llm, fake_mcp)
@@ -95,7 +95,7 @@ async def test_dynamic_chained_customer_and_issue_tool_calls():
     assert [n for n, _ in fake_mcp.calls] == ["find_customer", "list_open_issues"]
     assert result.events[-1].evidence_refs == ["issues:issue-001"]
     assert score_probe(result, ["find_customer", "list_open_issues"])["passed"]
-    assert any(x["role"] == "tool" and "customers:acme-001" in x["content"]
+    assert any(x["role"] == "tool" and "customers:ac000000-0000-4000-8000-000000000001" in x["content"]
                for x in fake_llm.received[-1][0])
 
 
@@ -178,5 +178,5 @@ def test_required_evidence_prevents_false_pass_on_wrong_customer():
     p = ProbeResult(answer="wrong customer", final_response_received=True,
                     events=[ToolEvent(name="find_customer", arguments={"customer_name": "Acme"},
                                       status="ok", evidence_refs=["customers:wrong"], duration_ms=1)])
-    s = score_probe(p, ["find_customer"], required_evidence_refs=["customers:acme-001"])
+    s = score_probe(p, ["find_customer"], required_evidence_refs=["customers:ac000000-0000-4000-8000-000000000001"])
     assert not s["passed"] and not s["evidence_check_passed"]

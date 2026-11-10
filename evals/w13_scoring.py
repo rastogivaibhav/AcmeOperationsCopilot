@@ -34,7 +34,8 @@ def score_agent_case(case: dict, result: dict) -> dict:
     any_terms = [str(t).lower() for t in case.get("expected_answer_terms_any", [])]
     forbidden_terms = [str(t).lower() for t in case.get("forbidden_answer_terms", [])]
     actual_uuids = set(UUID_PATTERN.findall(answer))
-    allowed_uuids = {item.rsplit(":", 1)[-1] for item in observed_refs if ":" in item}
+    allowed_uuids = ({item.rsplit(":", 1)[-1] for item in observed_refs if ":" in item}
+                     | set(result.get("grounded_identifiers") or []))
     # A model may repeat a user-supplied identifier; only sourceable assertions
     # are considered grounded. This check deliberately errs on the stricter side.
     user_uuids = set(UUID_PATTERN.findall(case.get("question", "")))
