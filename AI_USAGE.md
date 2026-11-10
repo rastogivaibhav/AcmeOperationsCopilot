@@ -39,3 +39,8 @@ AI coding assistance drafted a minimal run-telemetry schema, actor-scoped persis
 ## W13/W14 AI-assisted engineering record (9 Nov 2026)
 
 AI coding assistance prepared the ten-case evaluation specification, real LangGraph/MCP/Ollama evaluation runner, deterministic scoring rules, negative tests, human-review worksheet, architecture diagram and release-gate checker. It also revised GitHub Actions configuration and submission documentation. Offline tests were executed, and the actual results are recorded in `docs/W13-W14-STATUS.md`. **No real Ollama inference, Docker build, live role enforcement or GitHub workflow execution has been verified from this authoring environment.** Automated source-ID checks should not be presented as proof of hallucination-free answers; a human must inspect result quality and the AI-generated source before submission.
+
+
+## NVIDIA-inspired workflow adaptation, 10 Nov 2026
+
+AI-assisted design and code changes in draft PR #1 are based on the public NVIDIA Intelligent Warehouse, Deep Researcher/AI-Q and NeMo Agent Toolkit patterns (not copied NVIDIA implementation code). They add typed request signals, authenticated Skill and proposal prerequisites, fixture integrity checks and trajectory evaluation. The candidate must review these changes and the live runner results; no success beyond the measured main-branch W07 3/5, W09 model-Selected Skill failure, and W13 6/10 is asserted. See docs/NVIDIA_BLUEPRINT_ADAPTATION.md.
