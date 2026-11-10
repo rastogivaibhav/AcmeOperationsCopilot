@@ -131,8 +131,11 @@ async def execute_selected_tools(state: AgentState, runtime: Any) -> dict:
             events.append({"name": name, "status": "validation_error",
                            "evidence_refs": [], "duration_ms": 0, "error_code": code})
             continue
-        args, customer_binding = bind_customer_argument(name, args, state.get("messages", []))
-        args, issue_binding = bind_issue_argument(name, args, state.get("messages", []))
+        # Model calls may be batched; earlier tools in this batch have already
+        # returned scoped MCP results in outputs.
+        current_evidence = [*state.get("messages", []), *outputs]
+        args, customer_binding = bind_customer_argument(name, args, current_evidence)
+        args, issue_binding = bind_issue_argument(name, args, current_evidence)
         binding = customer_binding or issue_binding
         started = time.perf_counter()
         nested_events = []
