@@ -58,10 +58,14 @@ async def evaluate(input_path: Path = INPUT, output_path: Path = OUTPUT) -> int:
     cases = spec["cases"]
     validate_cases(cases)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    case_timeout = int(os.getenv("W13_CASE_TIMEOUT_SECONDS", "150"))
+    if not 30 <= case_timeout <= 240:
+        raise ValueError("W13_CASE_TIMEOUT_INVALID")
     report = {"suite": spec["suite"],
               "timestamp_utc": datetime.now(timezone.utc).isoformat(),
               "model": os.getenv("OLLAMA_MODEL", "qwen2.5:3b"),
-              "live_runtime_verified": False, "cases": [], "blockers": []}
+              "live_runtime_verified": False, "case_timeout_seconds": case_timeout,
+              "cases": [], "blockers": []}
     try:
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
         from app.agent.probe import acquire_token
@@ -79,14 +83,15 @@ async def evaluate(input_path: Path = INPUT, output_path: Path = OUTPUT) -> int:
                 record = {"id": case["id"], "role": case["role"],
                           "category": case.get("category", ""), "passed": False}
                 try:
-                    token = await acquire_token({"sales_user": "sales", "support_user": "support", "admin": "admin"}[case["role"]])
-                    async with AuthenticatedMCP(token) as mcp:
-                        # New thread per case to avoid contaminating independent results.
-                        observed = await execute_turn(graph, str(uuid.uuid4()), case["question"],
-                                                      load_blueprint(case["role"]), model, mcp)
-                        outcome = score_agent_case(case, observed)
-                        record.update(outcome)
-                        record["answer_excerpt"] = str(observed.get("answer") or "")[:2500]
+                    async with asyncio.timeout(case_timeout):
+                        token = await acquire_token({"sales_user": "sales", "support_user": "support", "admin": "admin"}[case["role"]])
+                        async with AuthenticatedMCP(token) as mcp:
+                            # New thread per case to avoid contaminating independent results.
+                            observed = await execute_turn(graph, str(uuid.uuid4()), case["question"],
+                                                          load_blueprint(case["role"]), model, mcp)
+                            outcome = score_agent_case(case, observed)
+                            record.update(outcome)
+                            record["answer_excerpt"] = str(observed.get("answer") or "")[:2500]
                 except Exception as exc:
                     # Only the class is persisted; external exception text may include secrets.
                     record["error_class"] = type(exc).__name__

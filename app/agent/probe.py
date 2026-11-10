@@ -12,7 +12,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from app.agent.tool_probe import run_probe, score_probe
+from app.agent.tool_probe import run_probe, score_probe, ProbeResult
 from app.agent.transports import AuthenticatedMCP, OllamaChat
 
 
@@ -49,18 +49,28 @@ async def acquire_token(role: str) -> str:
 
 async def evaluate(cases_path: Path, output: Path) -> int:
     cases = load_cases(cases_path)
+    case_timeout = int(os.getenv("W07_CASE_TIMEOUT_SECONDS", "150"))
+    if not 30 <= case_timeout <= 240:
+        raise ValueError("W07_CASE_TIMEOUT_INVALID")
     model = OllamaChat()
     # Fail fast and keep a machine-readable report of the blocker.
     report = {"suite": "W07 authenticated MCP / Ollama tool-selection spike",
               "timestamp_utc": datetime.now(timezone.utc).isoformat(),
               "model": model.model, "evaluated_cases": [], "passed": 0,
-              "total": len(cases), "live_runtime_verified": False}
+              "total": len(cases), "live_runtime_verified": False,
+              "case_timeout_seconds": case_timeout}
     try:
         await model.check_model()
         for case in cases:
-            token = await acquire_token(case["role"])
-            async with AuthenticatedMCP(token) as mcp:
-                observed = await run_probe(case["query"], model, mcp)
+            try:
+                async with asyncio.timeout(case_timeout):
+                    token = await acquire_token(case["role"])
+                    async with AuthenticatedMCP(token) as mcp:
+                        observed = await run_probe(case["query"], model, mcp)
+            except Exception as exc:
+                # Persist the error type, not exception details or auth tokens.
+                observed = ProbeResult(error="CASE_TIMEOUT" if isinstance(
+                    exc, TimeoutError) else type(exc).__name__)
             scored = score_probe(observed, case["expected_tools"],
                                  expected_status=case.get("expected_status", "ok"),
                                  expect_no_tools=case.get("expect_no_tools", False),

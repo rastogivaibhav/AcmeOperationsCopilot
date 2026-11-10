@@ -223,3 +223,18 @@ def test_ollama_model_residency_and_generation_budget(monkeypatch):
     monkeypatch.setenv("OLLAMA_KEEP_ALIVE", "invalid")
     with pytest.raises(ValueError, match="OLLAMA_KEEP_ALIVE_INVALID"):
         OllamaChat()
+
+
+@pytest.mark.asyncio
+async def test_live_case_deadlines_are_bounded_and_validate_config(monkeypatch, tmp_path):
+    from evals.run_w13 import evaluate as evaluate_w13
+    from app.agent.probe import evaluate as evaluate_w07
+    from pathlib import Path
+    monkeypatch.setenv("W13_CASE_TIMEOUT_SECONDS", "10000")
+    with pytest.raises(ValueError, match="W13_CASE_TIMEOUT_INVALID"):
+        await evaluate_w13(output_path=tmp_path / "w13.json")
+    monkeypatch.delenv("W13_CASE_TIMEOUT_SECONDS")
+    monkeypatch.setenv("W07_CASE_TIMEOUT_SECONDS", "0")
+    with pytest.raises(ValueError, match="W07_CASE_TIMEOUT_INVALID"):
+        await evaluate_w07(Path(__file__).resolve().parents[1] / "evals/w07_cases.json",
+                           tmp_path / "w07.json")
