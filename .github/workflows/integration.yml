@@ -14,6 +14,9 @@ on:
       - 'tests/test_agent_grounding_recovery.py'
 permissions:
   contents: read
+concurrency:
+  group: acme-live-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   full-stack:
     runs-on: ubuntu-latest
@@ -66,6 +69,17 @@ jobs:
         run: docker compose exec -T web python -m app.telemetry.smoke_w11
       # Keep each live score independent; do not hide failures or block later
       # diagnostic suites just because the local model misses an earlier case.
+      - name: Configure Python for headless browser acceptance
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Browser OIDC, RBAC visibility and conversation recovery
+        id: browser
+        continue-on-error: true
+        run: |
+          python -m pip install 'playwright>=1.56,<2'
+          python -m playwright install --with-deps chromium
+          python scripts/browser_smoke.py
       - name: W07 model and MCP tool-routing evaluation
         id: w07
         continue-on-error: true
@@ -85,12 +99,14 @@ jobs:
       - name: Enforce all independent agent gates
         if: always()
         env:
+          BROWSER_RESULT: ${{ steps.browser.outcome }}
           W07_RESULT: ${{ steps.w07.outcome }}
           W08_RESULT: ${{ steps.w08.outcome }}
           W09_RESULT: ${{ steps.w09.outcome }}
           W13_RESULT: ${{ steps.w13.outcome }}
         run: |
           printf 'W07=%s W08=%s W09=%s W13=%s\n' "$W07_RESULT" "$W08_RESULT" "$W09_RESULT" "$W13_RESULT"
+          test "$BROWSER_RESULT" = "success"
           test "$W07_RESULT" = "success"
           test "$W08_RESULT" = "success"
           test "$W09_RESULT" = "success"
