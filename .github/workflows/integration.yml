@@ -60,13 +60,37 @@ jobs:
         run: docker compose exec -T web python -m app.smoke_w10
       - name: Observability integration
         run: docker compose exec -T web python -m app.telemetry.smoke_w11
-      - name: Real model and LangGraph evaluation
-        run: |
-          docker compose exec -T web python -m app.agent.probe
-          docker compose exec -T web python -m app.agent.smoke_w08
-          docker compose exec -T web python -m app.skills.smoke_w09
+      # Keep each live score independent; do not hide failures or block later
+      # diagnostic suites just because the local model misses an earlier case.
+      - name: W07 model and MCP tool-routing evaluation
+        id: w07
+        continue-on-error: true
+        run: docker compose exec -T web python -m app.agent.probe
+      - name: W08 LangGraph execution smoke
+        id: w08
+        continue-on-error: true
+        run: docker compose exec -T web python -m app.agent.smoke_w08
+      - name: W09 escalation Skill smoke
+        id: w09
+        continue-on-error: true
+        run: docker compose exec -T web python -m app.skills.smoke_w09
       - name: Ten-question W13 agent evaluation
+        id: w13
+        continue-on-error: true
         run: docker compose exec -T web python -m evals.run_w13
+      - name: Enforce all independent agent gates
+        if: always()
+        env:
+          W07_RESULT: ${{ steps.w07.outcome }}
+          W08_RESULT: ${{ steps.w08.outcome }}
+          W09_RESULT: ${{ steps.w09.outcome }}
+          W13_RESULT: ${{ steps.w13.outcome }}
+        run: |
+          printf 'W07=%s W08=%s W09=%s W13=%s\n' "$W07_RESULT" "$W08_RESULT" "$W09_RESULT" "$W13_RESULT"
+          test "$W07_RESULT" = "success"
+          test "$W08_RESULT" = "success"
+          test "$W09_RESULT" = "success"
+          test "$W13_RESULT" = "success"
       - name: Application logs on failure
         if: failure()
         run: docker compose logs --no-color --tail=120 web mcp keycloak db-init
