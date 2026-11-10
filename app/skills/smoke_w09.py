@@ -83,6 +83,11 @@ async def evaluate() -> int:
     except Exception as exc:
         # Do not log bearer tokens or remote exception bodies in eval artifacts.
         report["errors"].append(type(exc).__name__)
+        nested = list(getattr(exc, "exceptions", ()))
+        while nested and len(report["errors"]) < 9:
+            item = nested.pop(0)
+            report["errors"].append(type(item).__name__)
+            nested.extend(getattr(item, "exceptions", ()))
     outfile.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print("W09_LIVE_PASS" if report["verified"] else "W09_LIVE_BLOCKED", outfile)
     return 0 if report["verified"] else 1
