@@ -194,3 +194,19 @@ def test_business_fixture_guard_refuses_drift_without_looking_at_secret_rows(mon
     monkeypatch.setattr(fixture_guard, "fingerprint",
                         lambda: {**clean, "sha256": "different"})
     assert not fixture_guard.check("verify", baseline)
+
+
+def test_intent_visibility_is_always_a_subset_of_existing_role_tools():
+    from app.agent.intent import tools_for_request
+    sales = load_blueprint("sales_user")
+    specs = agent_specs_for_profile(TOOL_DEFINITIONS, sales)
+    listed = lambda question: {item["function"]["name"] for item in tools_for_request(
+        specs, [{"role": "user", "content": question}])}
+    assert listed("Who owns the Acme Retail customer profile?") == {"find_customer"}
+    assert listed("Which issues are currently open for Acme Retail?") == {
+        "find_customer", "list_open_issues"}
+    assert listed(f"Show the issue history for issue {ISSUE}") == {"get_issue_history"}
+    assert listed("Define customer escalation in general.") == set()
+    assert listed("Assess escalation for Acme Retail") == {
+        "find_customer", "customer_escalation_summary"}
+    assert "request_next_action" not in listed(f"Propose an action for issue {ISSUE}")
