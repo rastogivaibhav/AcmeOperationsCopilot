@@ -319,7 +319,7 @@ async def test_complete_model_selected_skill_loop_without_scripted_tool_dispatch
     state["messages"].extend(decision["messages"])
     result = await execute_selected_tools(state, runtime)
     assert [e["name"] for e in result["tool_events"]] == [
-        SKILL_NAME, "list_open_issues", "get_issue_history"]
+        "list_open_issues", "get_issue_history", SKILL_NAME]
     state["messages"].extend(result["messages"])
     final = await reason_and_select(state, runtime)
     assert final["status"] == "complete"
