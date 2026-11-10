@@ -115,7 +115,22 @@ async def execute_selected_tools(state: AgentState, runtime: Any) -> dict:
         if not isinstance(fn, dict) or not isinstance(fn.get("name"), str):
             raise ValueError("INVALID_MODEL_TOOL_CALL")
         name = fn["name"]
-        args = validated_arguments(name, fn.get("arguments", {}), ctx.tool_definitions)
+        try:
+            args = validated_arguments(name, fn.get("arguments", {}), ctx.tool_definitions)
+        except ValueError as exc:
+            code = str(exc)
+            recoverable = {"REQUIRED_ARGUMENT_MISSING", "INVALID_STRING_ARGUMENT",
+                           "INVALID_INTEGER_ARGUMENT", "INVALID_ARRAY_ARGUMENT",
+                           "INVALID_TOOL_ARGUMENTS"}
+            if code not in recoverable:
+                raise  # Unknown tool and extra arguments still fail closed.
+            feedback = {"status": "validation_error", "data": None,
+                        "error_code": code, "evidence_refs": []}
+            outputs.append({"role": "tool", "tool_name": name,
+                            "content": json.dumps(feedback)})
+            events.append({"name": name, "status": "validation_error",
+                           "evidence_refs": [], "duration_ms": 0, "error_code": code})
+            continue
         args, customer_binding = bind_customer_argument(name, args, state.get("messages", []))
         args, issue_binding = bind_issue_argument(name, args, state.get("messages", []))
         binding = customer_binding or issue_binding
