@@ -59,6 +59,9 @@ def bind_customer_argument(name: str, arguments: dict, messages: list[dict]) -> 
     """Never replace a valid but different UUID; reject mismatched lookups."""
     if name not in {"list_open_issues", "customer_escalation_summary"}:
         return arguments, None
+    # The Skill may resolve a customer name internally via scoped MCP.
+    if name == "customer_escalation_summary" and arguments.get("customer_name"):
+        return arguments, None
     ids = verified_customer_ids(messages)
     value = arguments.get("customer_id")
     provided = _uuid(value)

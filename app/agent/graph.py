@@ -17,7 +17,8 @@ from app.agent.blueprint import Blueprint, agent_specs_for_profile
 from app.telemetry.tracing import tracer
 from app.actions import PROPOSAL_TOOL_SPECS, proposal_from_model
 from app.agent.tool_probe import MAX_RESULT_CHARS, validated_arguments
-from app.agent.intent import task_guidance, bind_explicit_issue, reject_unrelated_lookup
+from app.agent.intent import (task_guidance, bind_explicit_issue,
+                              reject_unrelated_lookup, explicit_customer_id)
 from app.agent.evidence import (bind_customer_argument, bind_issue_argument,
                                 trusted_identifiers, redact_unverified_identifiers)
 from app.skills.escalation import (
@@ -147,6 +148,12 @@ async def execute_selected_tools(state: AgentState, runtime: Any) -> dict:
             events.append({"name": name, "status": "validation_error",
                            "evidence_refs": [], "duration_ms": 0, "error_code": code})
             continue
+        if name == SKILL_NAME and "customer_name" not in args:
+            explicit_customer = explicit_customer_id(state.get("messages", []))
+            if explicit_customer and not (args.get("customer_id") or "").strip().startswith(explicit_customer):
+                # Explicit user reference is only an input. Scope is still
+                # verified by the authenticated MCP calls inside the Skill.
+                args = {**args, "customer_id": explicit_customer}
         # Model calls may be batched; earlier tools in this batch have already
         # returned scoped MCP results in outputs.
         current_evidence = [*state.get("messages", []), *outputs]
@@ -207,11 +214,13 @@ async def execute_selected_tools(state: AgentState, runtime: Any) -> dict:
                 content = json.dumps(condensed, ensure_ascii=False, default=str)
             if len(content) > MAX_RESULT_CHARS:
                 raise ValueError("MCP_RESULT_TOO_LARGE")
+        # Nested authorised lookups are real dependency steps and precede
+        # the Skill outcome in the trace, even if one LLM call requested it.
+        events.extend(nested_events)
         events.append({"name": name, "status": payload["status"],
                        "evidence_refs": refs, "duration_ms": latency_ms,
                        "argument_resolution": binding if binding and binding.startswith("BOUND_FROM_") else None,
                        "error_code": payload.get("error_code")})
-        events.extend(nested_events)
         for ref in refs:
             if ref not in evidence:
                 evidence.append(ref)

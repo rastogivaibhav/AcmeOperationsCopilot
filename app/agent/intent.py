@@ -63,6 +63,13 @@ def task_guidance(messages: list[dict]) -> str:
     return " ".join(hints)
 
 
+def explicit_customer_id(messages: list[dict]) -> str | None:
+    text = last_question(messages)
+    matches = tuple(dict.fromkeys(str(uuid.UUID(v)) for v in UUID_RE.findall(text)))
+    return matches[0] if len(matches) == 1 and re.search(
+        r"\bcustomer\s+id\b", text, re.I) else None
+
+
 def bind_explicit_issue(name: str, arguments: Any,
                         messages: list[dict]) -> tuple[Any, str | None]:
     """Correct absent/invalid history IDs from one explicitly supplied user UUID."""

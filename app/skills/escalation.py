@@ -39,11 +39,13 @@ SKILL_SPEC = {
         "parameters": {
             "type": "object",
             "properties": {
-                "customer_id": {"type": "string", "description": "UUID from find_customer"},
+                "customer_id": {"type": "string", "description": "UUID from find_customer or explicit customer ID"},
+                "customer_name": {"type": "string", "maxLength": 160,
+                                  "description": "Customer name; Skill resolves it using authenticated MCP"},
                 "issue_ids": {"type": "array", "items": {"type": "string"},
                               "maxItems": MAX_ISSUES, "description": "Optional authorised open issue UUIDs"},
             },
-            "required": ["customer_id"], "additionalProperties": False,
+            "required": [], "additionalProperties": False,
         },
     },
 }
@@ -150,7 +152,7 @@ class AuditedReadOnlyMCP:
     The wrapper cannot mint identity or gain authority; the underlying transport
     continues to enforce the current Keycloak principal and customer scope.
     """
-    READ_TOOLS = frozenset({"list_open_issues", "get_issue_history"})
+    READ_TOOLS = frozenset({"find_customer", "list_open_issues", "get_issue_history"})
 
     def __init__(self, transport: Any):
         self._transport = transport
@@ -291,14 +293,37 @@ def _assess_issue(issue: dict, history: dict, now: datetime) -> tuple[IssueAsses
 
 
 async def run_customer_escalation_summary(
-    mcp: Any, *, customer_id: str, issue_ids: list[str] | None = None,
+    mcp: Any, *, customer_id: str | None = None, customer_name: str | None = None,
+    issue_ids: list[str] | None = None,
     now: datetime | None = None,
 ) -> dict:
     """Read exclusively through authenticated MCP; return auditable structured output.
 
     No identity/roles/tokens are accepted from the caller, prompt or tool args.
     """
-    cid = _uuid(customer_id)
+    # Resolve a name only through the caller's authenticated MCP transport.
+    # A user-supplied identifier is NEVER proof of customer access.
+    if customer_name is not None:
+        if (not isinstance(customer_name, str) or not customer_name.strip()
+                or len(customer_name) > 160):
+            return _envelope("validation_error", error="INVALID_CUSTOMER_NAME")
+        match = await mcp.call_tool("find_customer", {"customer_name": customer_name.strip()})
+        record = _validate_result(match, "find_customer")
+        if not isinstance(record, dict) or not record.get("id"):
+            return _envelope("unavailable", error="CUSTOMER_NOT_ACCESSIBLE")
+        resolved_id = _uuid(record["id"])
+        if customer_id is not None:
+            try:
+                explicit_id = _uuid(customer_id)
+            except ValueError:
+                return _envelope("validation_error", error="INVALID_CUSTOMER_ID")
+            if explicit_id != resolved_id:
+                return _envelope("validation_error", error="CUSTOMER_ID_NAME_MISMATCH")
+        cid = resolved_id
+    elif customer_id is not None:
+        cid = _uuid(customer_id)
+    else:
+        return _envelope("validation_error", error="CUSTOMER_REFERENCE_REQUIRED")
     requested: list[str] | None = None
     if issue_ids is not None:
         if not isinstance(issue_ids, list) or not 1 <= len(issue_ids) <= MAX_ISSUES:
