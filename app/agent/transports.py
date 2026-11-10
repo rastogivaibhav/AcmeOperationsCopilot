@@ -6,12 +6,19 @@ from __future__ import annotations
 
 import json
 import os
+import re
 
 
 class OllamaChat:
     def __init__(self, model: str | None = None, url: str | None = None):
         self.model = model or os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
         self.url = (url or os.getenv("OLLAMA_URL", "http://ollama:11434")).rstrip("/")
+        self.keep_alive = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
+        if not re.fullmatch(r"[1-9][0-9]{0,2}[smh]", self.keep_alive):
+            raise ValueError("OLLAMA_KEEP_ALIVE_INVALID")
+        self.num_predict = int(os.getenv("OLLAMA_NUM_PREDICT", "512"))
+        if not 64 <= self.num_predict <= 1024:
+            raise ValueError("OLLAMA_NUM_PREDICT_INVALID")
 
     async def check_model(self) -> dict:
         import httpx2
@@ -29,7 +36,8 @@ class OllamaChat:
         async with httpx2.AsyncClient(timeout=httpx2.Timeout(15.0, read=240.0)) as client:
             response = await client.post(self.url + "/api/chat", json={
                 "model": self.model, "messages": messages, "tools": tools,
-                "stream": False, "options": {"temperature": 0},
+                "stream": False, "keep_alive": self.keep_alive,
+                "options": {"temperature": 0, "num_predict": self.num_predict},
             })
             response.raise_for_status()
             return response.json()

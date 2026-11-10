@@ -207,3 +207,19 @@ async def test_same_batch_find_then_issues_uses_first_authenticated_tool_result(
     assert [name for name, _ in mcp.calls] == ["find_customer", "list_open_issues"]
     assert mcp.calls[1][1]["customer_id"] == CUSTOMER
     assert "issues:" + ISSUE in result["evidence_refs"]
+
+
+def test_ollama_model_residency_and_generation_budget(monkeypatch):
+    from app.agent.transports import OllamaChat
+    monkeypatch.delenv("OLLAMA_KEEP_ALIVE", raising=False)
+    monkeypatch.delenv("OLLAMA_NUM_PREDICT", raising=False)
+    model = OllamaChat()
+    assert model.keep_alive == "30m"
+    assert model.num_predict == 512
+    monkeypatch.setenv("OLLAMA_NUM_PREDICT", "2000")
+    with pytest.raises(ValueError, match="OLLAMA_NUM_PREDICT_INVALID"):
+        OllamaChat()
+    monkeypatch.setenv("OLLAMA_NUM_PREDICT", "512")
+    monkeypatch.setenv("OLLAMA_KEEP_ALIVE", "invalid")
+    with pytest.raises(ValueError, match="OLLAMA_KEEP_ALIVE_INVALID"):
+        OllamaChat()
