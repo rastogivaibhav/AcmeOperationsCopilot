@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/integration.yml'
+      - 'compose.yaml'
+      - 'database/init_keycloak.py'
 permissions:
   contents: read
 jobs:
