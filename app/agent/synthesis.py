@@ -51,7 +51,7 @@ def compose_verified_answer(messages: list[dict],
         if not updates:
             lines.append("- No updates are recorded in the retrieved history.")
         if re.search(r"\b(?:provisional|confirm|conflict|fix)\b", question, re.I):
-            lines.append("The history does not independently confirm a permanent fix; "
+            lines.append("The provisional fix is not confirmed by the supplied evidence alone; "
                          "any conflicting customer updates require owner verification.")
         lines.append("Recommended next step: obtain confirmation from the issue owner "
                      "before treating the incident as resolved.")
