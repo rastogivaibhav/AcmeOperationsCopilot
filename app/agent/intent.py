@@ -155,7 +155,7 @@ _CUSTOMER_CUES = (
     re.compile(r"\b(?:assess|evaluate|summari[sz]e)\s+(?:the\s+)?"
                r"(?:customer\s+)?(?:escalation\s+)?risk\s+for\s+(?P<name>" +
                _CUSTOMER_NAME + r")\s*(?:[.?!]|$)", re.I),
-    re.compile(r"\b(?P<name>" + _CUSTOMER_NAME +
+    re.compile(r"^\s*(?:what(?:'s| is)\s+)?(?P<name>" + _CUSTOMER_NAME +
                r")['’]s\s+(?:customer\s+)?escalation\s+risk\b", re.I),
 )
 
