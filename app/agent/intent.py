@@ -144,3 +144,68 @@ def tools_for_request(definitions: list[dict], messages: list[dict]) -> list[dic
         return definitions
     return [spec for spec in definitions
             if spec.get("function", {}).get("name") in allowed]
+
+
+# Explicit customer names are untrusted resource locators, not an identity
+# or authorisation source. MCP still enforces customer visibility and role.
+_CUSTOMER_NAME = r"[A-Za-z][A-Za-z0-9 &'().-]{1,158}?"
+_CUSTOMER_CUES = (
+    re.compile(r"^\s*(?:for|regarding)\s+(?P<name>" + _CUSTOMER_NAME +
+               r")\s*,\s*(?:please\s+)?(?:use|run|assess|evaluate|summari[sz]e|show)\b", re.I),
+    re.compile(r"\b(?:assess|evaluate|summari[sz]e)\s+(?:the\s+)?"
+               r"(?:customer\s+)?(?:escalation\s+)?risk\s+for\s+(?P<name>" +
+               _CUSTOMER_NAME + r")\s*(?:[.?!]|$)", re.I),
+    re.compile(r"^\s*(?:what(?:'s| is)\s+)?(?P<name>" + _CUSTOMER_NAME +
+               r")['’]s\s+(?:customer\s+)?escalation\s+risk\b", re.I),
+)
+
+
+def explicit_customer_name(messages: list[dict]) -> str | None:
+    """Extract a customer name only from a narrow, explicit user phrase.
+
+    Never search the entire conversation or treat arbitrary assistant/model
+    output as an entity name. Ambiguous or generic requests must abstain.
+    """
+    question = last_question(messages)
+    if not question or len(question) > 2000:
+        return None
+    for pattern in _CUSTOMER_CUES:
+        match = pattern.search(question)
+        if match:
+            name = " ".join(match.group("name").strip().split())
+            if (2 <= len(name) <= 160 and
+                    name.casefold() not in {"a customer", "the customer", "any customer",
+                                            "this customer", "my customer", "a named customer"} and
+                    not UUID_RE.search(name)):
+                return name
+    return None
+
+
+def bind_skill_customer_name(name: str, arguments: Any,
+                             messages: list[dict]) -> tuple[Any, str | None]:
+    """Recover a missing Skill customer name from the *current user turn*.
+
+    Only applies after the model selected the authorised Skill. A supplied
+    conflicting customer name is rejected, not silently rewritten. Customer
+    existence and visibility are checked through authenticated MCP.
+    """
+    if name != "customer_escalation_summary" or not isinstance(arguments, dict):
+        return arguments, None
+    customer = explicit_customer_name(messages)
+    if customer is None:
+        return arguments, None
+    supplied = arguments.get("customer_name")
+    if isinstance(supplied, str) and supplied.strip():
+        if " ".join(supplied.split()).casefold() != customer.casefold():
+            return arguments, "CUSTOMER_NAME_MISMATCH_WITH_USER_REFERENCE"
+        return arguments, None
+    if isinstance(arguments.get("customer_id"), str):
+        try:
+            uuid.UUID(arguments["customer_id"])
+            return arguments, None  # Existing Skill/MCP permission enforcement.
+        except ValueError:
+            pass
+    updated = dict(arguments)
+    updated.pop("customer_id", None)  # Never forward a hallucinated placeholder.
+    updated["customer_name"] = customer
+    return updated, "BOUND_FROM_EXPLICIT_CUSTOMER_NAME"

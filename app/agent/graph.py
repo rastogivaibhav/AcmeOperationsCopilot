@@ -22,7 +22,7 @@ from app.agent.synthesis import compose_verified_answer
 from app.agent.tool_probe import MAX_RESULT_CHARS, validated_arguments
 from app.agent.intent import (task_guidance, bind_explicit_issue,
                               reject_unrelated_lookup, explicit_customer_id,
-                              tools_for_request)
+                              tools_for_request, bind_skill_customer_name)
 from app.agent.evidence import (bind_customer_argument, bind_issue_argument,
                                 trusted_identifiers, redact_unverified_identifiers)
 from app.skills.escalation import (
@@ -139,8 +139,12 @@ async def execute_selected_tools(state: AgentState, runtime: Any) -> dict:
         guard = reject_unrelated_lookup(name, state.get("messages", []))
         raw_args, explicit_issue_binding = bind_explicit_issue(
             name, fn.get("arguments", {}), state.get("messages", []))
-        if guard or (explicit_issue_binding and not explicit_issue_binding.startswith("BOUND_FROM_")):
-            code = guard or explicit_issue_binding
+        raw_args, customer_name_binding = bind_skill_customer_name(
+            name, raw_args, state.get("messages", []))
+        if (guard or
+                (explicit_issue_binding and not explicit_issue_binding.startswith("BOUND_FROM_")) or
+                (customer_name_binding and not customer_name_binding.startswith("BOUND_FROM_"))):
+            code = guard or explicit_issue_binding or customer_name_binding
             feedback = {"status": "validation_error", "data": None,
                         "error_code": code, "evidence_refs": []}
             outputs.append({"role": "tool", "tool_name": name, "content": json.dumps(feedback)})
@@ -198,7 +202,7 @@ async def execute_selected_tools(state: AgentState, runtime: Any) -> dict:
         current_evidence = [*state.get("messages", []), *outputs]
         args, customer_binding = bind_customer_argument(name, args, current_evidence)
         args, issue_binding = bind_issue_argument(name, args, current_evidence)
-        binding = customer_binding or issue_binding or explicit_issue_binding
+        binding = customer_binding or issue_binding or explicit_issue_binding or customer_name_binding
         started = time.perf_counter()
         nested_events = []
         if binding and not binding.startswith("BOUND_FROM_"):

@@ -2,7 +2,7 @@ name: Acme Copilot Live Compose Integration
 on:
   workflow_dispatch:
   push:
-    branches: [main, improve/nvidia-typed-workflows-evaluation]
+    branches: [main, improve/nvidia-typed-workflows-evaluation, fix/ev04-authorized-customer-resolution]
     paths:
       - '.github/workflows/integration.yml'
       - 'compose.yaml'
