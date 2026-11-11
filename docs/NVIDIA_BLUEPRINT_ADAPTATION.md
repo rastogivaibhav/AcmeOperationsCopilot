@@ -42,7 +42,7 @@ Measured main-branch reference at commit 47eb98b on 10 November 2026:
 - Keycloak/MCP, real browser session isolation, W08, role checks and controlled writes passed.
 - W07 3/5, W09 model-selected Skill failed, W13 6/10; full live acceptance failed.
 
-Those initial failures were resolved through merged, evaluated changes. On the assessed PR #2 revision, W07 **5/5**, W09 direct/model-selected execution and W13 **10/10** passed; fixture integrity and controlled-write denials also passed. The follow-up `main` integration run is a separate verification, and human groundedness/recommendation review remains outstanding.
+Those initial failures were resolved through merged, evaluated changes. On the assessed PR #2 revision, W07 **5/5**, W09 direct/model-selected execution and W13 **10/10** passed; fixture integrity and controlled-write denials also passed. The follow-up [`main` integration run](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994525) also **passed** the live W07/W09/W13 and security gates; human groundedness/recommendation review remains outstanding.
 
 ## Deliberately excluded
 

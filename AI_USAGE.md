@@ -17,18 +17,18 @@ This included:
 
 The initial W01–W14 drafting-stage notes reported that real Docker, Ollama, Keycloak and MCP could not be run **in the original local authoring environment**. That was accurate *at the time*, but those limitations were subsequently addressed using private GitHub-hosted integration runners.
 
-On **11 November 2026** the assessed PR #2 revision \`3437902f\` passed:
+On **11 November 2026** the assessed PR #2 revision `3437902f` passed:
 - **206** automated source tests and both Docker image builds ([CI](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983305290)).
 - Full Keycloak/HTTP/MCP/PostgreSQL/browser/W07–W13 integration ([GitHub full-stack run](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983299825)): W07 **5/5**, W08/W09 PASS and W13 **10/10 automated structural cases**.
-- Scoped read/denial checks, controlled business-write approvals, fixture integrity and \`source_ready_live_verified\` evidence gate.
+- Scoped read/denial checks, controlled business-write approvals, fixture integrity and `source_ready_live_verified` evidence gate.
 
-That revision was merged as \`1a2b936d3bd3\`; [post-merge CI](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994299) passed. The separate [post-merge integration run](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994525) should be checked independently.
+That revision was merged as `1a2b936d3bd3`; [post-merge CI](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994299) passed. The separate [post-merge integration run](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994525) **also passed** W07 **5/5**, W08/W09, W13 **10/10**, controlled writes, fixture integrity and the release evidence gate.
 
 Earlier iterations objectively scored 3/5 W07 and 6/10 W13. Subsequent fixes improved these to 5/5 and 10/10, including a former 150-second EV04 timeout that completed in **8.94 seconds** in the successful reference run. These measurements show the specific evaluated cases under the tested environment, not a general reliability guarantee.
 
 ## Human review and attribution boundaries
 
-The candidate should personally inspect source files, demo the application, review generated factual claims and advisory actions against actual source records, and fill in \`evals/manual_review_template.csv\`. Automated tool/citation/keyword checks are **not proof** that all natural-language answers are correct or business recommendations are appropriate. Manual semantic adjudication, an independent penetration test and production readiness have **not** been claimed.
+The candidate should personally inspect source files, demo the application, review generated factual claims and advisory actions against actual source records, and fill in `evals/manual_review_template.csv`. Automated tool/citation/keyword checks are **not proof** that all natural-language answers are correct or business recommendations are appropriate. Manual semantic adjudication, an independent penetration test and production readiness have **not** been claimed.
 
 The project originated from a confidential EY exercise; preserve the original restrictions when granting private GitHub access. Explain AI tools, generated code, defects discovered, corrections made, the decision to keep business writes human-approved, and the reasons for typed, evidence-aware workflows during the interview.
 

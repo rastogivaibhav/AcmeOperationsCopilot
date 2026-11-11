@@ -1,12 +1,12 @@
 # Acme Operations Copilot — measured agent evaluation
 
 **Completed full-stack acceptance (11 November 2026): PASS on PR #2 source revision**
-\`3437902f4448b002d1e978feb0d2ce06e6451f3e\`.
+`3437902f4448b002d1e978feb0d2ce06e6451f3e`.
 
-- [Full live Compose / Ollama / Keycloak / MCP evidence — GitHub Actions run 42983299825](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983299825) (download the private \`acme-live-evaluation\` artifact for raw per-case JSON).
+- [Full live Compose / Ollama / Keycloak / MCP evidence — GitHub Actions run 42983299825](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983299825) (download the private `acme-live-evaluation` artifact for raw per-case JSON).
 - [Source CI — run 42983305290](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983305290).
-- Merged into \`main\` as \`1a2b936d3bd3ddc77807ad170de6617e6d1f163e\` ([PR #2](https://github.com/rastogivaibhav/AcmeOperationsCopilot/pull/2)).
-- [Post-merge CI — run 42984994299](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994299): passed. [Post-merge full-stack evaluation — run 42984994525](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994525): check its own conclusion before claiming a second full acceptance.
+- Merged into `main` as `1a2b936d3bd3ddc77807ad170de6617e6d1f163e` ([PR #2](https://github.com/rastogivaibhav/AcmeOperationsCopilot/pull/2)).
+- [Post-merge CI — run 42984994299](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994299): passed. [Post-merge full-stack evaluation — run 42984994525](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994525): **PASS** on merged `main` commit `1a2b936d3bd3`, W07 **5/5**, W08/W09 PASS, W13 **10/10**, fixture integrity, writes and release gate all passed. EV04 completed in **5.831 seconds** on this post-merge run.
 
 ## Completed reference-run scorecard
 
@@ -23,7 +23,7 @@
 | W13 ten-case business evaluation | **10 / 10 structural passes** |
 | Read-only evaluation fixture checksum | Passed, unchanged |
 | W10 controlled writes, RBAC, approval and audit smoke | Passed |
-| Submission evidence gate | \`source_ready_live_verified\` |
+| Submission evidence gate | `source_ready_live_verified` |
 
 ### W13 case-level results (real model, measured duration)
 
@@ -44,10 +44,10 @@ Durations are one successful GitHub-hosted CPU/model run, not a latency service-
 
 ## How this changed
 
-An earlier 10 November baseline (\`47eb98b\`, [run 42858736570](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42858736570)) produced **W07 3/5, W09 model-selected Skill failure and W13 6/10**. Subsequent typed routing, authenticated evidence preconditions and bounded source synthesis improved the result to W07 5/5 and W13 9/10. PR #2 resolved EV04 by binding a narrowly extracted, explicit current-turn customer name **after the model selected the authorised Skill**, leaving all customer/issue access under MCP and Keycloak. The final reference run achieved W13 10/10.
+An earlier 10 November baseline (`47eb98b`, [run 42858736570](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42858736570)) produced **W07 3/5, W09 model-selected Skill failure and W13 6/10**. Subsequent typed routing, authenticated evidence preconditions and bounded source synthesis improved the result to W07 5/5 and W13 9/10. PR #2 resolved EV04 by binding a narrowly extracted, explicit current-turn customer name **after the model selected the authorised Skill**, leaving all customer/issue access under MCP and Keycloak. The final reference run achieved W13 10/10.
 
 ## Limitations and required human review
 
-**Automated PASS measures tool trajectories, required evidence references, response terms, role restrictions and proposal boundaries. It does not establish that every free-text claim, inference, recommendation or quoted update is semantically correct.** The candidate should complete \`evals/manual_review_template.csv\` using the actual artifact, assess contradictions and missing information, and confirm the demo covers approved/denied writes. These assessments are **not claimed as completed**.
+**Automated PASS measures tool trajectories, required evidence references, response terms, role restrictions and proposal boundaries. It does not establish that every free-text claim, inference, recommendation or quoted update is semantically correct.** The candidate should complete `evals/manual_review_template.csv` using the actual artifact, assess contradictions and missing information, and confirm the demo covers approved/denied writes. These assessments are **not claimed as completed**.
 
 This is a local, fictional technical-assessment implementation. Demo credentials, HTTP/Keycloak development configuration and seed data must not be exposed in a public deployment. Keep the repo private while EY's confidentiality restrictions apply.
