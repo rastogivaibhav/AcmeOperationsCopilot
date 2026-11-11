@@ -235,3 +235,86 @@ def test_proposal_visibility_uses_verified_policy_precondition():
         "request_issue_update"}
     assert visible(f"Inspect issue {ISSUE} and propose a next-action record") == {
         "request_next_action"}
+
+
+
+def test_verified_synthesis_histories_include_source_updates_not_fake_resolution():
+    from app.agent.synthesis import compose_verified_answer
+    from tests.test_agent_grounding_recovery import tool_message
+    msgs = [{"role":"user","content":"Show the conflicting issue history for issue "+ISSUE},
+            tool_message("get_issue_history", {"issue":{
+                "id": ISSUE, "status":"investigating", "priority":"critical"},
+                "updates":[{"id":"ad000000-0000-4000-8000-000000000002",
+                             "content":"Provisional fix sent"},
+                            {"id":"ad000000-0000-4000-8000-000000000003",
+                             "content":"Customer reports error still present"}]})]
+    answer = compose_verified_answer(msgs, [])
+    assert "still present" in answer and "not confirmed" in answer
+    assert "ad000000-0000-4000-8000-000000000003" in answer
+    assert compose_verified_answer(msgs[:1], []) is None
+
+
+def test_verified_synthesis_skill_risk_and_missing_information_are_source_only():
+    from app.agent.synthesis import compose_verified_answer
+    from tests.test_agent_grounding_recovery import tool_message
+    msgs = [{"role":"user","content":"Assess Acme Retail escalation risk"},
+            tool_message(SKILL_NAME, {"advisory_only":True,
+                "risk_level":"Critical", "executive_summary":"Two overdue issues",
+                "risk_reasons":["SLA breached"],
+                "recommended_actions":[{"action":"Contact support owner",
+                                         "issue_id":ISSUE, "persisted":False}],
+                "missing_information":["Confirmed remediation ETA absent"]})]
+    answer = compose_verified_answer(msgs, [])
+    assert "Critical" in answer and "SLA breached" in answer
+    assert "remediation ETA" in answer
+    assert "not saved" in answer
+    denied = [msgs[0],tool_message(SKILL_NAME, None,status="forbidden")]
+    assert compose_verified_answer(denied, []) is None
+
+
+def test_verified_synthesis_proposals_require_source_issue_history():
+    from app.agent.synthesis import compose_verified_answer
+    from tests.test_agent_grounding_recovery import tool_message
+    question = {"role":"user","content":"For issue "+ISSUE+" propose a next action"}
+    proposal = {"kind":"next_action","issue_id":ISSUE,"description":"Confirm ETA"}
+    assert compose_verified_answer([question], [proposal]) is None
+    messages = [question,tool_message("get_issue_history", {
+        "issue":{"id":ISSUE,"status":"investigating","version":1},
+        "updates":[]})]
+    answer = compose_verified_answer(messages,[proposal])
+    assert "PROPOSAL ONLY" in answer and "Confirm ETA" in answer
+    assert "not saved" in answer
+    assert compose_verified_answer(messages,[{**proposal,"issue_id":
+        "ab000000-0000-4000-8000-000000000099"}]) is None
+
+
+@pytest.mark.asyncio
+async def test_model_turn_finishes_from_verified_history_without_second_inference():
+    from app.agent.graph import reason_and_select
+    from tests.test_agent_grounding_recovery import tool_message
+    class NeverCall:
+        async def chat(self, messages, tools):
+            raise AssertionError("A second model call was not needed")
+    mcp=HistoryMCP()
+    bp=load_blueprint("support_user")
+    run=SimpleNamespace(context=RunContext(
+        bp,NeverCall(),mcp,agent_specs_for_profile(TOOL_DEFINITIONS,bp)))
+    state=graph_input("Retrieve history and conflicting updates for issue "+ISSUE)
+    state["model_turns"]=1
+    state["messages"] += [tool_message("get_issue_history",{
+        "issue":{"id":ISSUE,"status":"investigating","priority":"critical"},
+        "updates":[{"id":"ad000000-0000-4000-8000-000000000002",
+                    "content":"Customer says issue still present"}]})]
+    result=await reason_and_select(state,run)
+    assert result["status"]=="complete" and "not confirmed" in result["answer"]
+
+
+def test_never_synthesise_tool_data_from_other_conversation_turn():
+    from app.agent.synthesis import compose_verified_answer
+    from tests.test_agent_grounding_recovery import tool_message
+    previous=tool_message("get_issue_history",{
+        "issue":{"id":ISSUE,"status":"investigating"},
+        "updates":[]})
+    messages=[{"role":"user","content":"Issue "+ISSUE+" history"},previous,
+              {"role":"user","content":"Issue "+ISSUE+" history now"}]
+    assert compose_verified_answer(messages,[]) is None
