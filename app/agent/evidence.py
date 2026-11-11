@@ -11,6 +11,8 @@ import re
 import uuid
 from typing import Any
 
+from app.agent.intent import explicit_customer_id
+
 UUID_RE = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", re.I)
 IDENTIFIER_KEYS = frozenset({
     "id", "customer_id", "issue_id", "update_id", "account_owner_sub",
@@ -74,6 +76,12 @@ def bind_customer_argument(name: str, arguments: dict, messages: list[dict]) -> 
     if provided:
         if ids and provided not in ids:
             return arguments, "CUSTOMER_ID_MISMATCH_WITH_VERIFIED_LOOKUP"
+        # A generic user request does not authorise the model to invent a
+        # customer UUID, even one the caller could otherwise read. Require a
+        # prior current-turn lookup or an explicitly supplied customer ID.
+        # The MCP layer independently verifies actual customer permissions.
+        if name == "list_open_issues" and not ids and explicit_customer_id(messages) != provided:
+            return arguments, "VERIFIED_CUSTOMER_ID_REQUIRED"
         return arguments, None
     if len(ids) == 1:
         copied = dict(arguments)
