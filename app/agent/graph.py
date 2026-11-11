@@ -18,6 +18,7 @@ from app.agent.blueprint import Blueprint, agent_specs_for_profile
 from app.telemetry.tracing import tracer
 from app.actions import PROPOSAL_TOOL_SPECS, proposal_from_model
 from app.agent.dependencies import resolve_proposal
+from app.agent.synthesis import compose_verified_answer
 from app.agent.tool_probe import MAX_RESULT_CHARS, validated_arguments
 from app.agent.intent import (task_guidance, bind_explicit_issue,
                               reject_unrelated_lookup, explicit_customer_id,
@@ -59,6 +60,16 @@ async def reason_and_select(state: AgentState, runtime: Any) -> dict:
     if turns >= MAX_TURNS:
         return {"status": "failed", "answer": "Model turn budget exceeded"}
     messages = list(state.get("messages", []))
+    # A completed, evidence-backed workflow should not incur another costly
+    # model call just to restate authenticated records. Unknown/complex
+    # requests still use model synthesis; this branch can only render
+    # successful current-turn tool results, never create actions/approvals.
+    if turns > 0 and messages and messages[-1].get("role") == "tool":
+        verified = compose_verified_answer(messages, state.get("proposed_actions") or [])
+        if verified:
+            verified, _ = redact_unverified_identifiers(verified, messages)
+            return {"messages": [{"role": "assistant", "content": verified}],
+                    "status": "complete", "answer": verified}
     # Deny clear unauthorised write-only requests before model/tool invocation.
     if turns == 0 and ctx.blueprint.role == "sales_user":
         user_text = next((str(m.get("content") or "") for m in reversed(messages)
