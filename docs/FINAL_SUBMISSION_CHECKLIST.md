@@ -4,7 +4,7 @@
 
 The implementation is merged into private `main` at `1a2b936d3bd3`. [Source CI on the merged commit](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994299) **passed**. The [verified full-stack evaluation](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983299825) on source-equivalent PR commit `3437902f4448` passed W07 **5/5**, W08, W09, W13 **10/10**, browser OIDC, Keycloak/MCP, controlled writes and fixture integrity, with **206 offline tests** and successful Docker image builds. Its release gate returned `source_ready_live_verified`.
 
-**Post-merge full-stack evidence:** [run 42984994525](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994525); check the run's latest conclusion rather than assuming that the PR and merge runs are identical outcomes. See [measured report](../evals/report.md).
+**Post-merge full-stack evidence:** [run 42984994525](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994525) independently **passed**, including W07 5/5, W08/W09, W13 10/10, browser security, fixture integrity, controlled-write smoke and the release gate. See [measured report](../evals/report.md).
 
 This is an assessment prototype, **not production-ready**. Automated checks do not replace the candidate's own review of AI-generated code, factual answers or security trade-offs.
 
@@ -25,7 +25,7 @@ This is an assessment prototype, **not production-ready**. Automated checks do n
 - [x] Full-stack evaluation passed on the source-equivalent PR commit, including EV04
 - [x] Browser sign-in, conversation ownership, role denials and controlled writes exercised in GitHub Actions
 - [x] README, evaluation summary, security/publication notice and AI-usage handover reconciled to real evidence
-- [ ] Confirm the *post-merge* full-stack workflow concluded successfully: [check here](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994525)
+- [x] *Post-merge* full-stack workflow independently passed: [evidence](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994525)
 - [ ] Personally inspect the generated case records and fill `evals/manual_review_template.csv`; structural scoring alone cannot prove semantic grounding
 - [ ] Review AI-tool disclosure, design decisions and known limitations in preparation for evaluator Q&A
 - [ ] Invite the specific authorised EY GitHub usernames to the private repository (requires their usernames); do not make it public
