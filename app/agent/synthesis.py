@@ -50,7 +50,7 @@ def compose_verified_answer(messages: list[dict],
                          f"{_plain(update.get('content'), 400)}")
         if not updates:
             lines.append("- No updates are recorded in the retrieved history.")
-        if re.search(r"\b(?:provisional|confirm|conflict|fix)\b", question, re.I):
+        if re.search(r"\b(?:provisional|confirm(?:ed|ation)?|conflict(?:ing|ed)?|fix)\b", question, re.I):
             lines.append("The provisional fix is not confirmed by the supplied evidence alone; "
                          "any conflicting customer updates require owner verification.")
         lines.append("Recommended next step: obtain confirmation from the issue owner "
@@ -96,7 +96,7 @@ def compose_verified_answer(messages: list[dict],
             return None
         lines = [f"Verified issue {_plain(issue.get('id'), 80)}: "
                  f"current status {_plain(issue.get('status'), 60)}.",
-                 "PROPOSAL ONLY — no business record has been changed or saved."]
+                 "PROPOSAL ONLY — not saved. No business record has been changed."]
         for proposal in proposed_actions[-4:]:
             if not isinstance(proposal, dict) or str(proposal.get("issue_id")) != str(issue.get("id")):
                 return None
