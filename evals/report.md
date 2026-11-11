@@ -1,26 +1,53 @@
-# W13 Evaluation — measured baseline and adaptation branch
+# Acme Operations Copilot — Measured agent evaluation
 
-**Measured main-branch reference:** 10 November 2026, commit 47eb98b6689b13e16c7185aa123da126f0fd9185.
+**Current verified source-equivalent PR commit:** `3437902f4448b002d1e978feb0d2ce06e6451f3e` (11 November 2026).
+**Merged `main` commit:** `1a2b936d3bd3ddc77807ad170de6617e6d1f163e`.
 
-[GitHub Actions: verified baseline run](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42858736570)
+- [Full-stack successful evaluation — includes downloadable `acme-live-evaluation` artifact](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983299825)
+- [Post-merge CI — successful](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994299)
+- [Post-merge full-stack integration — check current conclusion](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994525)
+- [Merged EV04 customer-resolution fix, PR #2](https://github.com/rastogivaibhav/AcmeOperationsCopilot/pull/2)
 
-| Gate | Observed result |
+## Automated results — 11 November 2026
+
+| Verification | Measured result |
 |---|---|
-| Automated source tests | 171 passed |
-| Docker builds, Keycloak, MCP, browser OIDC and ownership | Passed |
-| Controlled writes, role restrictions and W08 LangGraph | Passed |
-| W07 tool routing | 3 / 5 |
-| W09 direct authenticated Skill | Passed |
-| W09 model-selected Skill | Failed |
-| W13 ten-case structural assessment | 6 / 10 |
-| Full-stack release acceptance | Failed |
+| Python offline tests | **206 passed** |
+| Both application Docker images | **Built successfully** |
+| Full Docker Compose startup and readiness | **Passed** |
+| Keycloak authentication and role-scoped MCP | **Passed** |
+| Browser OIDC, conversation restoration and cross-user isolation | **Passed** |
+| W07: native model/MCP tool selection | **5/5** |
+| W08: LangGraph execution/checkpoint smoke | **Passed** |
+| W09: authenticated escalation Skill (direct + model-selected) | **Passed** |
+| W13: ten-case structural business evaluation | **10/10** |
+| Read-only fixture before/after evaluation | **Identical hash, passed** |
+| W10: controlled business writes, denials and receipts | **Passed** |
+| Submission evidence gate | **`source_ready_live_verified`** |
 
-The observed failures include wrong tool selection, missing customer resolution, unsuccessful action proposal, and two 150-second timeouts. The GitHub Actions artifact contains the recorded tool/event paths. No human semantic accuracy or recommendation-quality verdict has been completed.
+### W13 individual cases
 
-## NVIDIA-inspired draft PR #1
+| Case | Scenario | Live result | Elapsed |
+|---|---|---|---:|
+| EV01 | Sales customer lookup | Pass | 9.34 s |
+| EV02 | Sales open issues | Pass | 11.70 s |
+| EV03 | Support conflicting issue history | Pass | 30.16 s |
+| EV04 | Sales customer escalation and advisory next steps | Pass | **8.94 s** |
+| EV05 | Sales access-scope denial | Pass | 5.98 s |
+| EV06 | Support unknown account | Pass | 10.97 s |
+| EV07 | Support proposal | Pass | 24.21 s |
+| EV08 | Admin proposal | Pass | 35.31 s |
+| EV09 | Sales write restriction | Pass | 0.07 s |
+| EV10 | General conversation without business tools | Pass | 4.73 s |
 
-The feature branch implements typed request signals, authenticated Skill/proposal prerequisites, fixture integrity checks, trajectory evaluation, and a fixed risk-assessment clock *only for automated evaluation*. See docs/NVIDIA_BLUEPRINT_ADAPTATION.md.
+The original 10 November baseline was **W07 3/5, W09 model-selected Skill failed and W13 6/10** (see [original run](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42858736570)). The NVIDIA-inspired typed workflow/Skill changes and EV04 recovery fix subsequently improved the live structural gates. No passing cases or original failure records have been deleted or reclassified.
 
-**These changes are not yet verified to improve live model performance.** Preserve all failure cases and compare the new run against the original with identical baseline fixtures, prompt/model settings and evaluation clock.
+## How to interpret these results
 
-An automated PASS verifies measured structure and specified record references. It does not independently prove that each natural-language factual claim is correct. A human reviewer must assess contradictory updates, missing information, recommendations and unauthorised actions. Do not substitute unit tests for measured inference.
+**Automated structural acceptance is achieved on the verified PR commit.** These checks verify tool calls, authenticated data references, expected response terms, proposal boundaries and selected state-transition rules; they do **not** constitute a manual factual audit of every natural-language claim, an independent penetration test, a production deployment certification or a guarantee of identical small-model results on other CPUs.
+
+The [`acme-live-evaluation` GitHub Actions artifact](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983299825) contains the actual JSON case records; that artifact is generated by CI and is not a committed, hand-edited score. Before external review, inspect representative answers, conflicting history interpretations, completeness, operational next-action quality, and security/permission assumptions using `evals/manual_review_template.csv`.
+
+The latest merged `main` is source-equivalent to the passing PR commit. Post-merge source CI passed; the post-merge full-stack run above is separate evidence and must be checked for its own final conclusion before it is described as passed.
+
+This is a **local-only, fictional EY technical assessment**. Do not use its disposable Keycloak passwords, HTTP configuration or data fixtures in production.
