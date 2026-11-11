@@ -19,6 +19,18 @@ class OllamaChat:
         self.num_predict = int(os.getenv("OLLAMA_NUM_PREDICT", "512"))
         if not 64 <= self.num_predict <= 1024:
             raise ValueError("OLLAMA_NUM_PREDICT_INVALID")
+        # A single named Skill requires only a short structured tool call.
+        # Restrict its generation budget; full answers keep their own limit.
+        self.skill_num_predict = int(os.getenv("OLLAMA_SKILL_NUM_PREDICT", "160"))
+        if not 64 <= self.skill_num_predict <= self.num_predict:
+            raise ValueError("OLLAMA_SKILL_NUM_PREDICT_INVALID")
+
+    def prediction_budget(self, tools: list[dict]) -> int:
+        names = [item.get("function", {}).get("name")
+                 for item in tools if isinstance(item, dict)]
+        if names == ["customer_escalation_summary"]:
+            return self.skill_num_predict
+        return self.num_predict
 
     async def check_model(self) -> dict:
         import httpx2
@@ -37,7 +49,7 @@ class OllamaChat:
             response = await client.post(self.url + "/api/chat", json={
                 "model": self.model, "messages": messages, "tools": tools,
                 "stream": False, "keep_alive": self.keep_alive,
-                "options": {"temperature": 0, "num_predict": self.num_predict},
+                "options": {"temperature": 0, "num_predict": self.prediction_budget(tools)},
             })
             response.raise_for_status()
             return response.json()

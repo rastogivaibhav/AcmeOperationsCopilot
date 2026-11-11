@@ -318,3 +318,29 @@ def test_never_synthesise_tool_data_from_other_conversation_turn():
     messages=[{"role":"user","content":"Issue "+ISSUE+" history"},previous,
               {"role":"user","content":"Issue "+ISSUE+" history now"}]
     assert compose_verified_answer(messages,[]) is None
+
+
+
+def test_explicit_named_skill_request_is_typed_even_without_risk_phrasing():
+    from app.agent.intent import tools_for_request
+    bp = load_blueprint("sales_user")
+    specs = agent_specs_for_profile(TOOL_DEFINITIONS, bp)
+    msg = [{"role":"user","content":(
+        "Use the customer_escalation_summary Skill for customer ID "
+        + CUSTOMER_ID + ". Report evidence.")}]
+    assert analyse_request(msg).purpose == "escalation"
+    assert [x["function"]["name"] for x in tools_for_request(specs,msg)] == [
+        SKILL_NAME]
+
+
+def test_single_skill_generation_budget_is_bounded(monkeypatch):
+    from app.agent.transports import OllamaChat
+    monkeypatch.delenv("OLLAMA_SKILL_NUM_PREDICT", raising=False)
+    model = OllamaChat()
+    spec = {"type":"function","function":{"name":SKILL_NAME}}
+    assert model.prediction_budget([spec]) == 160
+    assert model.prediction_budget([]) == model.num_predict
+    assert model.prediction_budget([spec,spec]) == model.num_predict
+    monkeypatch.setenv("OLLAMA_SKILL_NUM_PREDICT","10000")
+    with pytest.raises(ValueError, match="OLLAMA_SKILL_NUM_PREDICT_INVALID"):
+        OllamaChat()

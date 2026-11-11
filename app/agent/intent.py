@@ -36,7 +36,8 @@ def analyse_request(messages: list[dict]) -> RequestSignals:
         kind: Purpose = "general"
     elif re.search(r"\b(?:propos(?:e|al)|change status|(?:update|close|resolve|change) (?:the )?issue|create (?:an? )?action)\b", lower):
         kind = "proposal"
-    elif re.search(r"\b(?:escalat(?:e|ion|ion summary)|risk assessment|assess customer risk)\b",lower):
+    elif ("customer_escalation_summary" in lower or
+          re.search(r"\b(?:escalat(?:e|ion|ion summary)|risk assessment|assess customer risk)\b",lower)):
         kind = "escalation"
     elif re.search(r"\b(?:history|conflict|provisional fix)\b",lower):
         kind = "history"

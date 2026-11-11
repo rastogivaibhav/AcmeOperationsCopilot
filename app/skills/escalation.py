@@ -33,8 +33,10 @@ SKILL_SPEC = {
             "Reusable Customer Escalation Summary Skill. Evaluate authorised open issues "
             "for a customer, retrieve issue histories via MCP, apply deterministic risk "
             "rules, identify missing information, and return cited recommended actions. "
-            "Read-only: never creates or updates records. Find the customer first "
-            "to obtain a verified customer_id."
+            "Read-only: never creates or updates records. Pass customer_name "
+            "to resolve the name internally through authenticated MCP, or pass "
+            "the customer_id given explicitly by the user or a verified lookup. "
+            "No separate find_customer call is needed."
         ),
         "parameters": {
             "type": "object",
