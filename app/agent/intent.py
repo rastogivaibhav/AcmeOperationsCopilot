@@ -57,11 +57,13 @@ def task_guidance(messages: list[dict]) -> str:
                      ". Inspect get_issue_history with this exact UUID for history or proposals; "
                      "do not invent a customer name or substitute a different issue.")
     if signals.purpose == "escalation":
-        hints.append("For customer escalation use the customer_escalation_summary Skill. "
-                     "It accepts customer_name or a verified customer_id, and remains advisory.")
+        hints.append("Call customer_escalation_summary directly with customer_name "
+                     "or the explicit customer UUID. It performs authenticated lookups "
+                     "internally and remains advisory; do not call find_customer first.")
     if signals.purpose == "proposal":
-        hints.append("Read issue history, its current status and version before a proposal. "
-                     "Proposal tools cannot commit changes.")
+        hints.append("Select the appropriate request_issue_update or request_next_action "
+                     "proposal tool directly. Its policy layer will read authoritative "
+                     "issue history, status and version first. Proposals never commit writes.")
     if signals.purpose == "general":
         hints.append("This is a general definition; use no customer tools.")
     return " ".join(hints)
@@ -123,9 +125,20 @@ def tools_for_request(definitions: list[dict], messages: list[dict]) -> list[dic
     elif signals.purpose == "history" and signals.issue_id:
         allowed = {"get_issue_history"}
     elif signals.purpose == "proposal" and signals.issue_id:
-        allowed = {"get_issue_history", "request_issue_update", "request_next_action"}
+        # The authenticated proposal handler fetches issue history as a
+        # mandatory read-only prerequisite. Limit the model's job to choosing
+        # the requested *proposal*, never an autonomous business write.
+        question = last_question(messages).lower()
+        if re.search(r"\b(?:next.action|action record|contact (?:the )?owner)\b", question):
+            allowed = {"request_next_action"}
+        elif re.search(r"\b(?:status|reopen|close the issue)\b", question):
+            allowed = {"request_issue_update"}
+        else:
+            allowed = {"request_next_action", "request_issue_update"}
     elif signals.purpose == "escalation":
-        allowed = {"find_customer", "customer_escalation_summary"}
+        # Name lookup and issue histories are dependencies of the read-only
+        # Skill itself, so they need not consume additional model turns.
+        allowed = {"customer_escalation_summary"}
     if allowed is None:
         return definitions
     return [spec for spec in definitions

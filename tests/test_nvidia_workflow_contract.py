@@ -208,5 +208,30 @@ def test_intent_visibility_is_always_a_subset_of_existing_role_tools():
     assert listed(f"Show the issue history for issue {ISSUE}") == {"get_issue_history"}
     assert listed("Define customer escalation in general.") == set()
     assert listed("Assess escalation for Acme Retail") == {
-        "find_customer", "customer_escalation_summary"}
+        "customer_escalation_summary"}
     assert "request_next_action" not in listed(f"Propose an action for issue {ISSUE}")
+
+
+
+def test_explicit_customer_locator_can_reach_authenticated_skill_only():
+    from app.agent.evidence import bind_customer_argument
+    name = "customer_escalation_summary"
+    arguments = {"customer_id": CUSTOMER_ID}
+    args, error = bind_customer_argument(name, arguments, [
+        {"role":"user","content":"Assess risk for customer ID "+CUSTOMER_ID}])
+    assert args == arguments and error is None
+    # Direct issue-list reads still require an authorised customer lookup.
+    assert bind_customer_argument("list_open_issues",arguments,[])[1] == \
+        "VERIFIED_CUSTOMER_ID_REQUIRED"
+
+
+def test_proposal_visibility_uses_verified_policy_precondition():
+    from app.agent.intent import tools_for_request
+    bp = load_blueprint("admin")
+    specs = agent_specs_for_profile(TOOL_DEFINITIONS,bp)
+    visible = lambda question: {x["function"]["name"] for x in tools_for_request(
+        specs, [{"role":"user","content":question}])}
+    assert visible(f"Inspect issue {ISSUE} and propose changing its status to open") == {
+        "request_issue_update"}
+    assert visible(f"Inspect issue {ISSUE} and propose a next-action record") == {
+        "request_next_action"}
