@@ -10,13 +10,19 @@ import json
 import operator
 import re
 import time
+from datetime import datetime
 from dataclasses import dataclass
 from typing import Annotated, Any, TypedDict
 
 from app.agent.blueprint import Blueprint, agent_specs_for_profile
 from app.telemetry.tracing import tracer
 from app.actions import PROPOSAL_TOOL_SPECS, proposal_from_model
+from app.agent.dependencies import resolve_proposal
+from app.agent.synthesis import compose_verified_answer
 from app.agent.tool_probe import MAX_RESULT_CHARS, validated_arguments
+from app.agent.intent import (task_guidance, bind_explicit_issue,
+                              reject_unrelated_lookup, explicit_customer_id,
+                              tools_for_request)
 from app.agent.evidence import (bind_customer_argument, bind_issue_argument,
                                 trusted_identifiers, redact_unverified_identifiers)
 from app.skills.escalation import (
@@ -45,6 +51,7 @@ class RunContext:
     model: Any
     mcp: Any
     tool_definitions: list[dict]
+    evaluation_clock: datetime | None = None  # fixed only by trusted test caller
 
 
 async def reason_and_select(state: AgentState, runtime: Any) -> dict:
@@ -53,6 +60,16 @@ async def reason_and_select(state: AgentState, runtime: Any) -> dict:
     if turns >= MAX_TURNS:
         return {"status": "failed", "answer": "Model turn budget exceeded"}
     messages = list(state.get("messages", []))
+    # A completed, evidence-backed workflow should not incur another costly
+    # model call just to restate authenticated records. Unknown/complex
+    # requests still use model synthesis; this branch can only render
+    # successful current-turn tool results, never create actions/approvals.
+    if turns > 0 and messages and messages[-1].get("role") == "tool":
+        verified = compose_verified_answer(messages, state.get("proposed_actions") or [])
+        if verified:
+            verified, _ = redact_unverified_identifiers(verified, messages)
+            return {"messages": [{"role": "assistant", "content": verified}],
+                    "status": "complete", "answer": verified}
     # Deny clear unauthorised write-only requests before model/tool invocation.
     if turns == 0 and ctx.blueprint.role == "sales_user":
         user_text = next((str(m.get("content") or "") for m in reversed(messages)
@@ -65,9 +82,11 @@ async def reason_and_select(state: AgentState, runtime: Any) -> dict:
                     "model_turns": turns + 1, "status": "complete", "answer": answer}
     if sum(len(json.dumps(m, ensure_ascii=False, default=str)) for m in messages) > MAX_CONTEXT_CHARS:
         return {"status": "failed", "answer": "Conversation context exceeds bounded model input"}
+    hint = task_guidance(messages)
     response = await ctx.model.chat(
-        [{"role": "system", "content": ctx.blueprint.system_prompt}, *messages],
-        ctx.tool_definitions,
+        [{"role": "system", "content": ctx.blueprint.system_prompt +
+          ("\nTask-specific tool guidance: " + hint if hint else "")}, *messages],
+        tools_for_request(ctx.tool_definitions, messages),
     )
     message = response.get("message")
     if not isinstance(message, dict):
@@ -115,8 +134,45 @@ async def execute_selected_tools(state: AgentState, runtime: Any) -> dict:
         if not isinstance(fn, dict) or not isinstance(fn.get("name"), str):
             raise ValueError("INVALID_MODEL_TOOL_CALL")
         name = fn["name"]
+        # The classifier does not execute tools: it only rejects an unrelated
+        # customer lookup for a uniquely identified issue-history request.
+        guard = reject_unrelated_lookup(name, state.get("messages", []))
+        raw_args, explicit_issue_binding = bind_explicit_issue(
+            name, fn.get("arguments", {}), state.get("messages", []))
+        if guard or (explicit_issue_binding and not explicit_issue_binding.startswith("BOUND_FROM_")):
+            code = guard or explicit_issue_binding
+            feedback = {"status": "validation_error", "data": None,
+                        "error_code": code, "evidence_refs": []}
+            outputs.append({"role": "tool", "tool_name": name, "content": json.dumps(feedback)})
+            events.append({"name": name, "status": "validation_error",
+                           "evidence_refs": [], "duration_ms": 0, "error_code": code})
+            continue
+        if name in PROPOSAL_TOOL_SPECS:
+            # Never retrieve a dependency for a tool absent from this role's
+            # authorised blueprint. An LLM cannot expand its own authority.
+            if name not in ctx.blueprint.action_requests:
+                raise ValueError("TOOL_NOT_ALLOWED")
+            model_specs = {item["function"]["name"] for item in ctx.tool_definitions}
+            if name not in model_specs:
+                raise ValueError("TOOL_NOT_ALLOWED")
+            raw_args, prerequisites, pre_events, pre_error = await resolve_proposal(
+                name, raw_args, [*state.get("messages", []), *outputs], ctx.mcp)
+            outputs.extend(prerequisites)
+            events.extend(pre_events)
+            for pre_event in pre_events:
+                for ref in pre_event.get("evidence_refs", []):
+                    if ref not in evidence:
+                        evidence.append(ref)
+            if pre_error:
+                feedback = {"status":"validation_error", "data":None,
+                            "error_code":pre_error, "evidence_refs":[]}
+                outputs.append({"role":"tool", "tool_name":name,
+                                "content":json.dumps(feedback)})
+                events.append({"name":name,"status":"validation_error",
+                               "evidence_refs":[],"duration_ms":0,"error_code":pre_error})
+                continue
         try:
-            args = validated_arguments(name, fn.get("arguments", {}), ctx.tool_definitions)
+            args = validated_arguments(name, raw_args, ctx.tool_definitions)
         except ValueError as exc:
             code = str(exc)
             recoverable = {"REQUIRED_ARGUMENT_MISSING", "INVALID_STRING_ARGUMENT",
@@ -131,12 +187,18 @@ async def execute_selected_tools(state: AgentState, runtime: Any) -> dict:
             events.append({"name": name, "status": "validation_error",
                            "evidence_refs": [], "duration_ms": 0, "error_code": code})
             continue
+        if name == SKILL_NAME and "customer_name" not in args:
+            explicit_customer = explicit_customer_id(state.get("messages", []))
+            if explicit_customer and not (args.get("customer_id") or "").strip().startswith(explicit_customer):
+                # Explicit user reference is only an input. Scope is still
+                # verified by the authenticated MCP calls inside the Skill.
+                args = {**args, "customer_id": explicit_customer}
         # Model calls may be batched; earlier tools in this batch have already
         # returned scoped MCP results in outputs.
         current_evidence = [*state.get("messages", []), *outputs]
         args, customer_binding = bind_customer_argument(name, args, current_evidence)
         args, issue_binding = bind_issue_argument(name, args, current_evidence)
-        binding = customer_binding or issue_binding
+        binding = customer_binding or issue_binding or explicit_issue_binding
         started = time.perf_counter()
         nested_events = []
         if binding and not binding.startswith("BOUND_FROM_"):
@@ -156,7 +218,8 @@ async def execute_selected_tools(state: AgentState, runtime: Any) -> dict:
                         if name not in ctx.blueprint.skills:
                             raise ValueError("SKILL_NOT_ALLOWED")
                         scoped_mcp = AuditedReadOnlyMCP(ctx.mcp)
-                        payload = await run_customer_escalation_summary(scoped_mcp, **args)
+                        payload = await run_customer_escalation_summary(
+                            scoped_mcp, **args, now=ctx.evaluation_clock)
                         nested_events = scoped_mcp.events
                     else:
                         payload = await ctx.mcp.call_tool(name, args)
@@ -191,11 +254,13 @@ async def execute_selected_tools(state: AgentState, runtime: Any) -> dict:
                 content = json.dumps(condensed, ensure_ascii=False, default=str)
             if len(content) > MAX_RESULT_CHARS:
                 raise ValueError("MCP_RESULT_TOO_LARGE")
+        # Nested authorised lookups are real dependency steps and precede
+        # the Skill outcome in the trace, even if one LLM call requested it.
+        events.extend(nested_events)
         events.append({"name": name, "status": payload["status"],
                        "evidence_refs": refs, "duration_ms": latency_ms,
                        "argument_resolution": binding if binding and binding.startswith("BOUND_FROM_") else None,
-                       "error_code": payload.get("error_code")})
-        events.extend(nested_events)
+                       "source": "model_selected", "error_code": payload.get("error_code")})
         for ref in refs:
             if ref not in evidence:
                 evidence.append(ref)
@@ -229,11 +294,12 @@ def graph_input(user_message: str) -> AgentState:
 
 
 async def execute_turn(graph: Any, conversation_id: str, message: str,
-                       blueprint: Blueprint, model: Any, mcp: Any) -> dict:
+                       blueprint: Blueprint, model: Any, mcp: Any,
+                       evaluation_clock: datetime | None = None) -> dict:
     """Owner checking belongs to the caller *before* invoking this graph thread."""
     specs = agent_specs_for_profile(await mcp.list_tools(), blueprint)
     context = RunContext(blueprint=blueprint, model=model, mcp=mcp,
-                         tool_definitions=specs)
+                         tool_definitions=specs, evaluation_clock=evaluation_clock)
     result = await graph.ainvoke(graph_input(message),
                                 config={"configurable": {"thread_id": "conv:" + conversation_id},
                                         "recursion_limit": 22},

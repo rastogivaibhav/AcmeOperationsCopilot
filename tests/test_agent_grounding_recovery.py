@@ -192,7 +192,7 @@ async def test_missing_required_skill_argument_is_model_feedback_not_exception()
     state["messages"].append({"role": "assistant", "tool_calls": [
         call("customer_escalation_summary")]})
     outcome = await execute_selected_tools(state, runtime("sales_user", mcp))
-    assert outcome["tool_events"][0]["error_code"] == "REQUIRED_ARGUMENT_MISSING"
+    assert outcome["tool_events"][0]["error_code"] == "VERIFIED_CUSTOMER_ID_REQUIRED"
     assert mcp.calls == []
 
 

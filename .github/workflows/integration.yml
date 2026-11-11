@@ -2,7 +2,7 @@ name: Acme Copilot Live Compose Integration
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, improve/nvidia-typed-workflows-evaluation]
     paths:
       - '.github/workflows/integration.yml'
       - 'compose.yaml'
@@ -63,8 +63,6 @@ jobs:
         run: |
           docker compose exec -T web python -m app.smoke
           docker compose exec -T web python -m app.smoke_w06
-      - name: Controlled business write integration
-        run: docker compose exec -T web python -m app.smoke_w10
       - name: Observability integration
         run: docker compose exec -T web python -m app.telemetry.smoke_w11
       # Keep each live score independent; do not hide failures or block later
@@ -80,6 +78,8 @@ jobs:
           python -m pip install 'playwright>=1.56,<2'
           python -m playwright install --with-deps chromium
           python scripts/browser_smoke.py
+      - name: Capture clean business fixture before agent evaluation
+        run: docker compose exec -T web python -m evals.fixture_guard --capture
       - name: W07 model and MCP tool-routing evaluation
         id: w07
         continue-on-error: true
@@ -96,6 +96,14 @@ jobs:
         id: w13
         continue-on-error: true
         run: docker compose exec -T web python -m evals.run_w13
+      - name: Verify read-only agent evaluation did not change business data
+        id: fixture
+        continue-on-error: true
+        run: docker compose exec -T web python -m evals.fixture_guard --verify
+      - name: Controlled business write integration (after evaluation)
+        id: w10
+        continue-on-error: true
+        run: docker compose exec -T web python -m app.smoke_w10
       - name: Enforce all independent agent gates
         if: always()
         env:
@@ -104,6 +112,8 @@ jobs:
           W08_RESULT: ${{ steps.w08.outcome }}
           W09_RESULT: ${{ steps.w09.outcome }}
           W13_RESULT: ${{ steps.w13.outcome }}
+          FIXTURE_RESULT: ${{ steps.fixture.outcome }}
+          W10_RESULT: ${{ steps.w10.outcome }}
         run: |
           printf 'W07=%s W08=%s W09=%s W13=%s\n' "$W07_RESULT" "$W08_RESULT" "$W09_RESULT" "$W13_RESULT"
           test "$BROWSER_RESULT" = "success"
@@ -111,22 +121,26 @@ jobs:
           test "$W08_RESULT" = "success"
           test "$W09_RESULT" = "success"
           test "$W13_RESULT" = "success"
+          test "$FIXTURE_RESULT" = "success"
+          test "$W10_RESULT" = "success"
       - name: Application logs on failure
         if: failure()
         run: docker compose logs --no-color --tail=120 web mcp keycloak db-init
-      - name: Release evidence gate
-        if: always()
-        run: python scripts/verify_release.py
       - name: Copy results from ephemeral containers
         if: always()
         continue-on-error: true
-        run: docker compose cp web:/code/evals/results ./live-results
+        run: |
+          mkdir -p evals/results
+          docker compose cp web:/code/evals/results/. ./evals/results/
+      - name: Verify actual submission evidence
+        if: always()
+        run: python scripts/verify_release.py --submission
       - name: Upload evaluation reports (no credentials)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: acme-live-evaluation
-          path: live-results/
+          path: evals/results/
           if-no-files-found: ignore
       - name: Runtime service status
         if: always()

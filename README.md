@@ -69,7 +69,7 @@ Keycloak admin: `local-admin` / `LocalOnlyChangeThis123!` by default. Change thr
 
 ### W06 browser login and personal workspace
 
-Open **http://localhost:8000**, click **Sign in with Keycloak**, and use a fictional local demo account shown above. The login uses Authorization Code + PKCE, one-use state, nonce validation, and Redis-backed server-side sessions. The website at `/app` shows the user's verified role and allowed capabilities. Create and view owner-scoped conversation records from the Investigations panel. The W08 browser chat endpoint calls a real LangGraph agent; W09 adds a reusable risk-assessment Skill. No responses are simulated. Live integration remains unverified.
+Open **http://localhost:8000**, click **Sign in with Keycloak**, and use a fictional local demo account shown above. The login uses Authorization Code + PKCE, one-use state, nonce validation, and Redis-backed server-side sessions. The website at `/app` shows the user's verified role and allowed capabilities. Create and view owner-scoped conversation records from the Investigations panel. The W08 browser chat endpoint calls a real LangGraph agent; W09 adds a reusable risk-assessment Skill. No responses are simulated. Core live integration has been verified, but agent-quality acceptance remains failed.
 
 **Localhost only:** browser cookie uses `HttpOnly; SameSite=Lax`; `Secure` is intentionally off because the demo uses HTTP. Token material stays in Redis; the website never reads it. In production, TLS, Secure cookies, hardened identity delegation and proper credential storage would be mandatory.
 
@@ -291,7 +291,7 @@ docker compose cp web:/code/evals/results ./evals/results
 python scripts/verify_release.py --submission
 ```
 
-The generated JSON and Markdown files contain **measured** outcomes only when that live run actually finishes. See `evals/report.md` for current **NOT MEASURED** status and the limitations of automated grounding checks; complete `evals/manual_review_template.csv` after reviewing the model's actual outputs.
+The generated JSON and Markdown files contain **measured** outcomes only when that live run actually finishes. See `evals/report.md` for the measured 6/10 main-branch baseline and the limitations of automated grounding checks; complete `evals/manual_review_template.csv` after reviewing the model's actual outputs.
 
 Run `python scripts/verify_release.py` for the static source manifest. It intentionally does not claim a Docker or GitHub Actions pass. Use `docs/FINAL_SUBMISSION_CHECKLIST.md` and `docs/W13-W14-STATUS.md` for the remaining runtime gates and five EY deliverables.
 

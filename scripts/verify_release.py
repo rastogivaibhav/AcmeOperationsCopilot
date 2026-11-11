@@ -26,7 +26,11 @@ MANDATORY = [
 ]
 CONFIDENTIAL_FILENAMES = ["FDE_Case Study_Candidate Pack.docx"]
 LIVE_REPORTS = {
-    "foundation": "evals/results/w11-live.json",  # additional HTTP ownership telemetry checks
+    "tool_routing": "evals/results/w07-live.json",
+    "agent_graph": "evals/results/w08-live.json",
+    "escalation_skill": "evals/results/w09-live.json",
+    "write_controls": "evals/results/w10-live.json",
+    "foundation": "evals/results/w11-live.json",
     "agent_evaluation": "evals/results/w13-live.json",
 }
 
@@ -46,16 +50,27 @@ def inspect() -> dict:
             continue
         try:
             data = json.loads(path.read_text())
-            verified = (data.get("live_runtime_verified") is True
-                        if key == "agent_evaluation" else data.get("verified") is True)
-            all_pass = (data.get("summary", {}).get("passed") == 10
-                        if key == "agent_evaluation" else verified)
+            if key == "agent_evaluation":
+                verified = data.get("live_runtime_verified") is True
+                all_pass = data.get("summary", {}).get("passed") == 10
+            elif key == "tool_routing":
+                verified = data.get("live_runtime_verified") is True
+                all_pass = (data.get("total") == 5 and data.get("passed") == 5
+                            and len(data.get("evaluated_cases", [])) == 5)
+            elif key == "escalation_skill":
+                verified = data.get("verified") is True
+                all_pass = (data.get("direct_skill_passed") is True and
+                            data.get("model_selected_skill_passed") is True)
+            else:
+                verified = data.get("verified") is True
+                all_pass = verified
             live[key] = "pass" if verified and all_pass else "failed_or_incomplete"
         except (OSError, ValueError):
             live[key] = "invalid_report"
     return {
-        "status": "source_ready_live_unverified" if not missing and not leaks and not env and ten_cases
-                  else "source_checks_failed",
+        "status": ("source_checks_failed" if missing or leaks or env or not ten_cases
+                   else "source_ready_live_verified" if all(v == "pass" for v in live.values())
+                   else "source_ready_live_unverified"),
         "required_file_count": len(MANDATORY), "missing_required_files": missing,
         "confidential_documents_in_repo": leaks, "untracked_env_files_present": env,
         "ten_unique_evaluation_questions": ten_cases, "live_gates": live,
@@ -72,7 +87,7 @@ def main() -> int:
     result = inspect()
     OUTPUT.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2))
-    if result['status'] != 'source_ready_live_unverified':
+    if result['status'] == 'source_checks_failed':
         return 1
     if args.submission and any(v != 'pass' for v in result['live_gates'].values()):
         print('NOT_SUBMISSION_VERIFIED: live results missing or failed')

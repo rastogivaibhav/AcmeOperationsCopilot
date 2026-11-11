@@ -2,6 +2,7 @@
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import importlib
+import json
 import sys
 import types
 import uuid
@@ -133,6 +134,12 @@ async def test_graph_proposal_does_not_call_mcp_write():
     mcp = FakeMCP()
     definitions = agent_specs_for_profile(TOOL_DEFINITIONS, blueprint)
     state = graph_input("Create a recommended next action")
+    # The policy requires a verified history before drafting an action.
+    state["messages"].append({"role":"tool","tool_name":"get_issue_history",
+                              "content":json.dumps({"status":"ok",
+                                  "data":{"issue":{"id": ISSUE, "status":"investigating",
+                                                    "version":1},"updates":[]},
+                                  "evidence_refs":["issues:"+ISSUE]})})
     state["messages"].append({"role": "assistant", "tool_calls": [{"function": {
         "name": "request_next_action",
         "arguments": {"issue_id": ISSUE, "description": "Ask owner for evidence"}}}]})

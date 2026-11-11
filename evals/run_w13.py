@@ -39,7 +39,12 @@ def _report_markdown(report: dict) -> str:
                     f"{'PASS' if case.get('passed') else 'FAIL'} | "
                     f"{case.get('elapsed_ms', 0)} | {', '.join(failed) or '—'} |")
     summ = report.get("summary", {})
+    as_of = report.get("evaluation_as_of_utc")
+    if as_of:
+        rows.append(f"\n**Fixture/risk assessment clock:** {as_of}")
     rows.extend(["", f"**Automated structural passes:** {summ.get('passed',0)} / {summ.get('case_count',10)}",
+                 f"**Median case latency (ms):** {summ.get('latency_ms',{}).get('median')}",
+                 f"**P95 nearest-rank latency (ms):** {summ.get('latency_ms',{}).get('p95_nearest_rank')}",
                  "", "## Limitations and commentary", "",
                  "- A PASS validates the reported structure, expected tool sequence, some factual terms and observed evidence IDs. It does not prove semantic groundedness.",
                  "- Review every generated recommendation and claimed business fact against the supplied tool data, checking omitted context and potential hallucination.",
@@ -57,6 +62,9 @@ async def evaluate(input_path: Path = INPUT, output_path: Path = OUTPUT) -> int:
     spec = json.loads(input_path.read_text(encoding="utf-8"))
     cases = spec["cases"]
     validate_cases(cases)
+    evaluation_clock = datetime.fromisoformat(spec["evaluation_as_of_utc"])
+    if evaluation_clock.tzinfo is None:
+        raise ValueError("EVALUATION_AS_OF_MUST_HAVE_TIMEZONE")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     case_timeout = int(os.getenv("W13_CASE_TIMEOUT_SECONDS", "150"))
     if not 30 <= case_timeout <= 240:
@@ -65,6 +73,7 @@ async def evaluate(input_path: Path = INPUT, output_path: Path = OUTPUT) -> int:
               "timestamp_utc": datetime.now(timezone.utc).isoformat(),
               "model": os.getenv("OLLAMA_MODEL", "qwen2.5:3b"),
               "live_runtime_verified": False, "case_timeout_seconds": case_timeout,
+              "evaluation_as_of_utc": evaluation_clock.isoformat(),
               "cases": [], "blockers": []}
     try:
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -88,7 +97,8 @@ async def evaluate(input_path: Path = INPUT, output_path: Path = OUTPUT) -> int:
                         async with AuthenticatedMCP(token) as mcp:
                             # New thread per case to avoid contaminating independent results.
                             observed = await execute_turn(graph, str(uuid.uuid4()), case["question"],
-                                                          load_blueprint(case["role"]), model, mcp)
+                                                          load_blueprint(case["role"]), model, mcp,
+                                                          evaluation_clock=evaluation_clock)
                             outcome = score_agent_case(case, observed)
                             record.update(outcome)
                             record["answer_excerpt"] = str(observed.get("answer") or "")[:2500]

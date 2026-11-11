@@ -197,7 +197,8 @@ def test_blueprints_inherit_same_read_only_skill_and_schema_is_not_mcp_mock():
         assert SKILL_NAME in b.skills
         specs = agent_specs_for_profile(TOOL_DEFINITIONS, b)
         skill_spec = next(s for s in specs if s["function"]["name"] == SKILL_NAME)
-        assert skill_spec["function"]["parameters"]["required"] == ["customer_id"]
+        assert skill_spec["function"]["parameters"]["required"] == []
+        assert "customer_name" in skill_spec["function"]["parameters"]["properties"]
         assert "create_next_action" not in {s["function"]["name"] for s in specs}
 
 
@@ -229,11 +230,11 @@ async def test_agent_executes_skill_only_when_model_selects_it():
     state["messages"].append({"role": "assistant", "content": "", "tool_calls": [
         {"function": {"name": SKILL_NAME, "arguments": {"customer_id": CUSTOMER_ID}}}]})
     output = await execute_selected_tools(state, runtime)
-    assert output["tool_events"][0]["name"] == SKILL_NAME
+    assert output["tool_events"][-1]["name"] == SKILL_NAME
     assert len(mcp.calls) == 2
     assert [e["name"] for e in output["tool_events"]] == [
-        SKILL_NAME, "list_open_issues", "get_issue_history"]
-    assert all(e.get("parent_skill") == SKILL_NAME for e in output["tool_events"][1:])
+        "list_open_issues", "get_issue_history", SKILL_NAME]
+    assert all(e.get("parent_skill") == SKILL_NAME for e in output["tool_events"][:-1])
     assert f"issues:{CRITICAL_ID}" in output["evidence_refs"]
     assert "Critical" in output["messages"][0]["content"]
     assert "access_token" not in str(output)
@@ -318,7 +319,7 @@ async def test_complete_model_selected_skill_loop_without_scripted_tool_dispatch
     state["messages"].extend(decision["messages"])
     result = await execute_selected_tools(state, runtime)
     assert [e["name"] for e in result["tool_events"]] == [
-        SKILL_NAME, "list_open_issues", "get_issue_history"]
+        "list_open_issues", "get_issue_history", SKILL_NAME]
     state["messages"].extend(result["messages"])
     final = await reason_and_select(state, runtime)
     assert final["status"] == "complete"

@@ -11,6 +11,8 @@ import re
 import uuid
 from typing import Any
 
+from app.agent.intent import explicit_customer_id
+
 UUID_RE = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", re.I)
 IDENTIFIER_KEYS = frozenset({
     "id", "customer_id", "issue_id", "update_id", "account_owner_sub",
@@ -59,12 +61,27 @@ def bind_customer_argument(name: str, arguments: dict, messages: list[dict]) -> 
     """Never replace a valid but different UUID; reject mismatched lookups."""
     if name not in {"list_open_issues", "customer_escalation_summary"}:
         return arguments, None
+    # The Skill may resolve a customer name internally via scoped MCP.
+    if name == "customer_escalation_summary":
+        # The Skill performs its own authenticated, customer-scoped MCP
+        # lookup. A user-provided valid ID is a locator, never authorisation.
+        # No evidence is invented or used to bypass MCP permissions.
+        if arguments.get("customer_name"):
+            return arguments, None
+        if _uuid(arguments.get("customer_id")):
+            return arguments, None
     ids = verified_customer_ids(messages)
     value = arguments.get("customer_id")
     provided = _uuid(value)
     if provided:
         if ids and provided not in ids:
             return arguments, "CUSTOMER_ID_MISMATCH_WITH_VERIFIED_LOOKUP"
+        # A generic user request does not authorise the model to invent a
+        # customer UUID, even one the caller could otherwise read. Require a
+        # prior current-turn lookup or an explicitly supplied customer ID.
+        # The MCP layer independently verifies actual customer permissions.
+        if name == "list_open_issues" and not ids and explicit_customer_id(messages) != provided:
+            return arguments, "VERIFIED_CUSTOMER_ID_REQUIRED"
         return arguments, None
     if len(ids) == 1:
         copied = dict(arguments)
@@ -88,7 +105,9 @@ def bind_issue_argument(name: str, arguments: dict, messages: list[dict]) -> tup
                     ids.add(found)
     value = _uuid(arguments.get("issue_id"))
     if value:
-        return (arguments, "ISSUE_ID_MISMATCH_WITH_VERIFIED_HISTORY") if ids and value not in ids else (arguments, None)
+        if not ids:
+            return arguments, "VERIFIED_ISSUE_HISTORY_REQUIRED"
+        return (arguments, "ISSUE_ID_MISMATCH_WITH_VERIFIED_HISTORY") if value not in ids else (arguments, None)
     if len(ids) == 1:
         updated = dict(arguments)
         updated["issue_id"] = next(iter(ids))

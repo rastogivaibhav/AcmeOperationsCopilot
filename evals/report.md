@@ -1,28 +1,26 @@
-# W13 evaluation report — evidence status
+# W13 Evaluation — measured baseline and adaptation branch
 
-**Status: NOT EXECUTED against a live Ollama/Keycloak/MCP/PostgreSQL stack.**
+**Measured main-branch reference:** 10 November 2026, commit 47eb98b6689b13e16c7185aa123da126f0fd9185.
 
-This file is a truthful submission placeholder and test plan, **not a claim of 10 passing evaluations**. Run `python -m evals.run_w13` **inside the running web container** to obtain measured, timestamped results in `evals/results/w13-live.json` and `evals/results/w13-live-report.md`. Include those outputs only after an actual run and manual review.
+[GitHub Actions: verified baseline run](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42858736570)
 
-## Test design
-
-- Ten independent natural-language questions in `evals/w13_cases.json` across Sales, Support and Admin.
-- Dynamically constructed LangGraph agent instances, real Keycloak bearer tokens, actual MCP read tools, an actual local Ollama model and PostgreSQL checkpoints.
-- Automated checks for tool choice/order, tool denials, source-record presence, obvious unsupported identifiers, safe proposals and no autonomous writes.
-- The W09 direct Skill verification supplies a separate deterministic check of risk classification and recommended actions.
-- The W10 live smoke checks actual permission denial, confirmation, idempotent retry and database effects.
-
-## Interpretation
-
-Automated tool routing and evidence-ID checks are necessary but insufficient for semantic grounding. A human assessor must inspect each generated answer against its actual returned records, including the proposed next action's operational reasonableness, omitted contradictory updates, stale data, false assertions and acknowledgement of missing information.
-
-| Metric | Result |
+| Gate | Observed result |
 |---|---|
-| Live 10-question pass rate | **NOT MEASURED** |
-| Tool-routing accuracy | **NOT MEASURED** |
-| Evidence-linked response rate | **NOT MEASURED** |
-| RBAC integration pass rate | **NOT MEASURED** |
-| Recommended-action quality | **NEEDS LIVE EXECUTION + HUMAN REVIEW** |
-| Live latency | **NOT MEASURED** |
+| Automated source tests | 171 passed |
+| Docker builds, Keycloak, MCP, browser OIDC and ownership | Passed |
+| Controlled writes, role restrictions and W08 LangGraph | Passed |
+| W07 tool routing | 3 / 5 |
+| W09 direct authenticated Skill | Passed |
+| W09 model-selected Skill | Failed |
+| W13 ten-case structural assessment | 6 / 10 |
+| Full-stack release acceptance | Failed |
 
-**Never replace `NOT MEASURED` with a unit-test pass count.**
+The observed failures include wrong tool selection, missing customer resolution, unsuccessful action proposal, and two 150-second timeouts. The GitHub Actions artifact contains the recorded tool/event paths. No human semantic accuracy or recommendation-quality verdict has been completed.
+
+## NVIDIA-inspired draft PR #1
+
+The feature branch implements typed request signals, authenticated Skill/proposal prerequisites, fixture integrity checks, trajectory evaluation, and a fixed risk-assessment clock *only for automated evaluation*. See docs/NVIDIA_BLUEPRINT_ADAPTATION.md.
+
+**These changes are not yet verified to improve live model performance.** Preserve all failure cases and compare the new run against the original with identical baseline fixtures, prompt/model settings and evaluation clock.
+
+An automated PASS verifies measured structure and specified record references. It does not independently prove that each natural-language factual claim is correct. A human reviewer must assess contradictory updates, missing information, recommendations and unauthorised actions. Do not substitute unit tests for measured inference.
