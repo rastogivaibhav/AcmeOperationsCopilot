@@ -1,6 +1,6 @@
 # NVIDIA-inspired Acme Agent Workflow Adaptation
 
-**Status:** Draft PR #1, not yet accepted on live model metrics. No NVIDIA runtime, hosted endpoint, or proprietary source code has been added.
+**Status (11 November 2026):** The NVIDIA-inspired workflow changes from [merged PR #1](https://github.com/rastogivaibhav/AcmeOperationsCopilot/pull/1), followed by the [EV04 fix in merged PR #2](https://github.com/rastogivaibhav/AcmeOperationsCopilot/pull/2), passed the [reference full-stack evaluation](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983299825): W07 **5/5**, W09 PASS and W13 **10/10 structural cases**. No NVIDIA runtime, hosted endpoint or proprietary source was added.
 
 ## Design references
 
@@ -35,15 +35,14 @@ These are design-pattern adaptations. No NVIDIA SDK dependency or blueprint impl
 - W13 records distinct tool-trajectory checks and measured median/p95 case latencies; these cannot replace human review of semantic factual correctness.
 - A strict submission release gate checks real W07/W08/W09/W10/W11/W13 reports, not merely source files.
 
-## Pre-change evidence
+## Pre-change evidence and measured outcome
 
 Measured main-branch reference at commit 47eb98b on 10 November 2026:
 - 171/171 offline tests and both Docker image builds passed.
 - Keycloak/MCP, real browser session isolation, W08, role checks and controlled writes passed.
 - W07 3/5, W09 model-selected Skill failed, W13 6/10; full live acceptance failed.
 
-The feature branch must be rerun on the same dataset and clock before making improvement claims.
-Goals: repeatable W07 5/5, W09 direct + model-selected Skill, W13 9/10+ (with case-level commentary), unchanged write denials, no fixture drift, and manual groundedness review.
+Those initial failures were resolved through merged, evaluated changes. On the assessed PR #2 revision, W07 **5/5**, W09 direct/model-selected execution and W13 **10/10** passed; fixture integrity and controlled-write denials also passed. The follow-up `main` integration run is a separate verification, and human groundedness/recommendation review remains outstanding.
 
 ## Deliberately excluded
 

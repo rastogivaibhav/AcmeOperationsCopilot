@@ -4,7 +4,7 @@
 
 **Implementation slices:** W01–W14 source: platform, browser IAM, LangGraph agent, escalation Skill, controlled writes, activity/telemetry, ten-case evaluation harness and submission documentation.
 
-**Status:** Source and offline tests exist. Full Docker start, real browser Keycloak sign-in, database migration and MCP integration have **NOT** been executed in the authoring environment, which has no Docker daemon or package-index access. Do not claim G0/G1/G2 completion yet.
+**Verified status (11 November 2026):** The fully tested PR #2 source revision `3437902f` passed **206 offline tests**, both Docker image builds, W07 **5/5**, W08 and W09, the W13 **10/10 structural evaluation**, real Keycloak/MCP/browser/controlled-write checks, and read-only fixture integrity. [Source CI](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983305290) · [Full live integration](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983299825). This was merged to `main` at `1a2b936d3bd3ddc77807ad170de6617e6d1f163e`; [post-merge CI](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994299) passed and the [post-merge full-stack run](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994525) is tracked separately. The 10/10 result is **automated structural acceptance, not independent human factual review or production certification**.
 
 This is a fictional, local-only technical exercise. Do not upload the confidential EY candidate pack, real enterprise data, or access tokens to the repository.
 
@@ -69,7 +69,7 @@ Keycloak admin: `local-admin` / `LocalOnlyChangeThis123!` by default. Change thr
 
 ### W06 browser login and personal workspace
 
-Open **http://localhost:8000**, click **Sign in with Keycloak**, and use a fictional local demo account shown above. The login uses Authorization Code + PKCE, one-use state, nonce validation, and Redis-backed server-side sessions. The website at `/app` shows the user's verified role and allowed capabilities. Create and view owner-scoped conversation records from the Investigations panel. The W08 browser chat endpoint calls a real LangGraph agent; W09 adds a reusable risk-assessment Skill. No responses are simulated. Core live integration has been verified, but agent-quality acceptance remains failed.
+Open **http://localhost:8000**, click **Sign in with Keycloak**, and use a fictional local demo account shown above. The login uses Authorization Code + PKCE, one-use state, nonce validation, and Redis-backed server-side sessions. The website at `/app` shows the user's verified role and allowed capabilities. Create and view owner-scoped conversation records from the Investigations panel. The W08 browser chat endpoint calls a real LangGraph agent; W09 adds a reusable risk-assessment Skill. No responses are simulated. Full-stack agent acceptance passed on the evaluated PR source revision; see the measured evidence and limitations in [evals/report.md](evals/report.md).
 
 **Localhost only:** browser cookie uses `HttpOnly; SameSite=Lax`; `Secure` is intentionally off because the demo uses HTTP. Token material stays in Redis; the website never reads it. In production, TLS, Secure cookies, hardened identity delegation and proper credential storage would be mandatory.
 
@@ -94,10 +94,10 @@ The last API call is an **actual MCP protocol call**, not a REST implementation 
 
 | Tool | Args | Permissions | Status in this slice |
 |---|---|---|---|
-| `find_customer` | customer_name | authorised read; Sales scoped | Implemented, not live verified |
-| `list_open_issues` | customer_id | authorised read; Sales scoped | Implemented, not live verified |
-| `get_issue_history` | issue_id | authorised read; Sales scoped | Implemented, not live verified |
-| `create_next_action` | issue_id, description, approval_id, operation_id | Admin, recorded human approval | Implemented, not live verified |
+| `find_customer` | customer_name | authorised read; Sales scoped | Implemented; live smoke verified |
+| `list_open_issues` | customer_id | authorised read; Sales scoped | Implemented; live smoke verified |
+| `get_issue_history` | issue_id | authorised read; Sales scoped | Implemented; live smoke verified |
+| `create_next_action` | issue_id, description, approval_id, operation_id | Admin, recorded human approval | Implemented; live smoke verified |
 
 **Write approval boundary:** Admin obtains a fresh, 10-minute approval receipt by explicitly calling `POST /api/approvals` with an authenticated bearer token and `confirmed: true`. The LLM/MCP layer cannot issue approvals. To commit, the authenticated admin invokes MCP `create_next_action` with the exact approval and operation IDs. PostgreSQL enforces `UNIQUE(operation_id)` for idempotency. The future web UI must provide a deliberate confirmation step and CSRF-protected BFF sessions; browser OIDC is W06.
 
@@ -113,7 +113,7 @@ docker compose exec web python -m app.agent.probe \
 docker compose cp web:/code/evals/results/w07-live.json ./evals/results/w07-live.json
 ```
 
-The evaluator dynamically loads three read-only MCP tool schemas and gives them to Ollama's native `/api/chat` tool-calling endpoint; model-selected calls execute against the **real** MCP server using a verified Keycloak demo-user token. It records chosen tool order, statuses, evidence refs, time and errors across five cases. No successful live result has been claimed. Controlled writes remain disabled in this W07 spike. [Full W07 runbook](docs/W07-STATUS.md).
+The original W07 probe dynamically loads read-only MCP tool schemas and gives them to Ollama's native `/api/chat` tool-calling endpoint; model-selected calls execute against the **real** MCP server using a verified Keycloak demo-user token. It records chosen tool order, statuses, evidence refs, time and errors across five cases. W07 passed 5/5 on the reference live run; per-case evidence is in the GitHub Actions evaluation artifact. Controlled writes remain disabled in this W07 spike. [Full W07 runbook](docs/W07-STATUS.md).
 
 ## Tests and checks
 
@@ -124,7 +124,7 @@ pip install '.[test]'
 sh scripts/verify_static.sh
 ```
 
-Live checks once Docker is available:
+To rerun the verified live checks on a machine with Docker:
 
 ```bash
 docker compose config
@@ -135,13 +135,15 @@ docker compose exec web python -m app.smoke
 docker compose exec web python -m app.smoke_w06
 ```
 
-A PASS requires live output `LIVE_FOUNDATION_SMOKE_PASS` plus verification that `docker compose up` starts all services. The current environment cannot produce this evidence. An offline `pytest` run does **not** establish production-readiness or EY acceptance.
+GitHub Actions has completed the real Compose foundation, JWT/Keycloak and MCP smoke checks successfully. Offline `pytest` alone does **not** establish production readiness; consult the [completed full-stack run](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983299825).
 
 ## Deliverable boundaries
 
-**Historical W01–W05 baseline:** foundation implementation. W01 dependency graph is declared but **no lockfile yet** due to package-index unavailability. W02 images and model images are versioned, but boot unverified. W03 actual DB migration/seed unverified. W04 browser callback postponed to W06 and token validation is currently bearer-only. W05 server/tools implemented but untested over a running network.
+The implementation-history statements below are intentionally distinguished from verified present-day evidence.
 
-**Current source through W10:** identity-aware browser, role profiles, real model/MCP tool-calling flow, LangGraph checkpointing and chat UI. **Not runtime-verified:** Docker, Keycloak, Ollama, MCP and LangGraph checkpoints in a running integrated environment. **Next:** mandatory live Docker/Keycloak/MCP/Ollama integration, real W13 measurement, human result review and GitHub Actions evidence before any final acceptance claim. Do not present this foundation as a complete EY assessment yet.
+**Historical W01–W05 implementation notes:** The first drafts predated real Docker, database migration and Keycloak/MCP validation. Those initial verification gaps were subsequently addressed with GitHub-hosted Compose runs; this sentence records development history, not the present test status.
+
+**Current scope through W14:** OIDC/Keycloak, authenticated MCP, LangGraph/Ollama, PostgreSQL checkpointing, escalation Skill, approved business actions, browser UI, telemetry and reproducible live evaluations have all run in GitHub-hosted Compose. **Still outstanding for submission sign-off:** human review of individual facts, recommendations, the confidentiality requirements and the handover evidence; this is a local technical-assessment prototype, not a production deployment.
 
 ## References
 
@@ -175,7 +177,7 @@ More: [`docs/W06-STATUS.md`](docs/W06-STATUS.md).
 
 The new `/app` workspace now includes an actual investigation chat (not a simulated chatbot). Open or create a conversation, enter a customer question, and the backend invokes **LangGraph → Ollama → Keycloak-authenticated MCP → PostgreSQL**. The model chooses tools dynamically from the real MCP tool catalogue. Completed conversation state is checkpointed in PostgreSQL, and the browser transcript is stored in owner-scoped tables.
 
-A single enterprise blueprint supplies shared response standards. Three versioned role profiles supply distinct personas. The agent cannot receive a write tool merely because YAML says so; W08 offers only `find_customer`, `list_open_issues` and `get_issue_history`. W09 adds the model-invocable, read-only `customer_escalation_summary` Skill. Controlled write integration remains W10.
+A single enterprise blueprint supplies shared response standards. Three versioned role profiles supply distinct personas. The agent cannot receive a write tool merely because YAML says so; W08 offers only `find_customer`, `list_open_issues` and `get_issue_history`. W09 adds the model-invocable, read-only `customer_escalation_summary` Skill, now with authorised customer-name resolution. Controlled write integration remains W10.
 
 **Run W08 live gate after Docker startup:**
 
@@ -184,9 +186,9 @@ docker compose exec web python -m app.agent.smoke_w08
 docker compose cp web:/code/evals/results/w08-live.json ./evals/results/w08-live.json
 ```
 
-This gate requires real Keycloak login, real MCP tool selection and a PostgreSQL checkpoint restored from a fresh connection. No passing live report exists until that command executes. Full details: [`docs/W08-STATUS.md`](docs/W08-STATUS.md).
+This gate requires real Keycloak login, real MCP tool selection and a PostgreSQL checkpoint restored from a fresh connection. W08 passed in the [completed reference run](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983299825). Full details: [`docs/W08-STATUS.md`](docs/W08-STATUS.md).
 
-**Important:** If a role/blueprint changes, W08 intentionally requires a new conversation. A finer-grained customer scope invalidation and interrupted-node retry protocol remain W10/W16 work. The app is still a development candidate, not a complete EY submission.
+**Important:** If a role/blueprint changes, W08 intentionally requires a new conversation. A finer-grained customer scope invalidation and interrupted-node retry protocol remain W10/W16 work. The app is a tested local assessment prototype; an EY handover still requires candidate review of the recorded evidence and trade-offs.
 
 
 ## W09 — Reusable Customer Escalation Summary Skill
@@ -199,7 +201,7 @@ W09 adds a versioned, model-selectable **`customer_escalation_summary`** local S
 - Explicit missing confirmed ETA, business impact and contradictory/missing updates.
 - Nested MCP tool-call event statuses and timings for observability.
 
-All three roles inherit the same Skill but the authenticated MCP identity independently limits which customer records can be read. The model dynamically decides whether the Skill is needed. Blueprint versions are bumped from `0.2.0` to `0.3.0`; **create a new conversation after upgrading** because existing W08 threads deliberately reject changed blueprints.
+All three roles inherit the same Skill but the authenticated MCP identity independently limits which customer records can be read. The model selects the Skill for relevant intents, while typed intent guidance and authenticated dependencies support reliable execution. Blueprint versions are bumped from `0.2.0` to `0.3.0`; **create a new conversation after upgrading** because existing W08 threads deliberately reject changed blueprints.
 
 After the full stack starts, run the W09 real-transport and real-model verification:
 
@@ -208,7 +210,7 @@ docker compose exec web python -m app.skills.smoke_w09
 docker compose cp web:/code/evals/results/w09-live.json ./evals/results/w09-live.json
 ```
 
-The report flags the direct authenticated Skill check and model-selected invocation separately; no passing report is claimed unless both succeed. Offline tests and detailed rubric: [`docs/W09-STATUS.md`](docs/W09-STATUS.md).
+The report checks direct authenticated Skill execution and model-selected invocation separately. Both passed in the [completed live integration](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983299825). Offline tests and detailed rubric: [`docs/W09-STATUS.md`](docs/W09-STATUS.md).
 
 
 ## W10 — Role-specific write proposals, confirmation, receipts
@@ -268,7 +270,7 @@ Two workflows are included:
 - **Acme Copilot CI** on push/PR: Python tests, static verification, browser JavaScript check, Compose configuration validation, and builds for both custom Docker images.
 - **Acme Copilot Live Compose Integration** via manual workflow dispatch: starts the full local stack on a disposable GitHub runner and executes actual Keycloak/MCP/agent smoke tests, preserving evaluation JSON results as a build artifact.
 
-The GitHub connector available to this conversation cannot create a new repository. After extracting the project and installing/authenticating `gh` on your machine, use:
+**The repository already exists and is private.** The following publishing script is only for independent re-creations; it is **not needed** to share this existing repository with authorised EY reviewers:
 
 ```bash
 # Recommended while the assessment confidentiality restriction applies
@@ -281,7 +283,7 @@ bash scripts/publish_github.sh --private
 Do not interpret offline success as a green live model or Docker integration result. For the work-package details and verification limits, see [`docs/W11-W12-STATUS.md`](docs/W11-W12-STATUS.md).
 
 
-## W13/W14 — Evaluation, release and GitHub CI
+## W13/W14 — Measured evaluation, release and GitHub CI
 
 The source now includes a **ten-question real-agent evaluation specification** (`evals/w13_cases.json`) and runner (`evals/run_w13.py`). Once the full stack is healthy:
 
@@ -291,8 +293,8 @@ docker compose cp web:/code/evals/results ./evals/results
 python scripts/verify_release.py --submission
 ```
 
-The generated JSON and Markdown files contain **measured** outcomes only when that live run actually finishes. See `evals/report.md` for the measured 6/10 main-branch baseline and the limitations of automated grounding checks; complete `evals/manual_review_template.csv` after reviewing the model's actual outputs.
+The actual live JSON and Markdown results from the completed reference run are available as the private GitHub Actions `acme-live-evaluation` artifact. See [evals/report.md](evals/report.md) for the **10/10 completed reference run**, the earlier 6/10 baseline, and the limitations of structural grounding checks. Complete `evals/manual_review_template.csv` after personally inspecting the model's actual outputs.
 
-Run `python scripts/verify_release.py` for the static source manifest. It intentionally does not claim a Docker or GitHub Actions pass. Use `docs/FINAL_SUBMISSION_CHECKLIST.md` and `docs/W13-W14-STATUS.md` for the remaining runtime gates and five EY deliverables.
+Run `python scripts/verify_release.py` for the static source manifest. It intentionally does not claim a Docker or GitHub Actions pass. Use [docs/FINAL_SUBMISSION_CHECKLIST.md](docs/FINAL_SUBMISSION_CHECKLIST.md) for final evidence, confidentiality, human review and the five EY deliverables. Earlier slice-status documents describe their original development stages.
 
 **GitHub:** `.github/workflows/ci.yml` provides push/PR offline checks and container builds; `.github/workflows/integration.yml` is a manually triggered full-stack and model evaluation run. Actions work on private repositories. EY's confidentiality instruction means the solution should remain **private during the assessment window**; publishing publicly would share the solution.

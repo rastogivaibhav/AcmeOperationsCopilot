@@ -1,26 +1,53 @@
-# W13 Evaluation — measured baseline and adaptation branch
+# Acme Operations Copilot — measured agent evaluation
 
-**Measured main-branch reference:** 10 November 2026, commit 47eb98b6689b13e16c7185aa123da126f0fd9185.
+**Completed full-stack acceptance (11 November 2026): PASS on PR #2 source revision**
+\`3437902f4448b002d1e978feb0d2ce06e6451f3e\`.
 
-[GitHub Actions: verified baseline run](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42858736570)
+- [Full live Compose / Ollama / Keycloak / MCP evidence — GitHub Actions run 42983299825](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983299825) (download the private \`acme-live-evaluation\` artifact for raw per-case JSON).
+- [Source CI — run 42983305290](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983305290).
+- Merged into \`main\` as \`1a2b936d3bd3ddc77807ad170de6617e6d1f163e\` ([PR #2](https://github.com/rastogivaibhav/AcmeOperationsCopilot/pull/2)).
+- [Post-merge CI — run 42984994299](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994299): passed. [Post-merge full-stack evaluation — run 42984994525](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994525): check its own conclusion before claiming a second full acceptance.
+
+## Completed reference-run scorecard
 
 | Gate | Observed result |
 |---|---|
-| Automated source tests | 171 passed |
-| Docker builds, Keycloak, MCP, browser OIDC and ownership | Passed |
-| Controlled writes, role restrictions and W08 LangGraph | Passed |
-| W07 tool routing | 3 / 5 |
-| W09 direct authenticated Skill | Passed |
-| W09 model-selected Skill | Failed |
-| W13 ten-case structural assessment | 6 / 10 |
-| Full-stack release acceptance | Failed |
+| Offline/static Python suite | **206 passed** |
+| Both custom Docker image builds | Passed |
+| Compose startup, health, database fixture | Passed |
+| Keycloak/OIDC/JWT, authenticated MCP and customer scope | Passed |
+| Browser sign-in, conversation recovery and cross-user isolation | Passed |
+| W07 model-selected tool routing | **5 / 5** |
+| W08 LangGraph/checkpoint execution | Passed |
+| W09 direct and model-selected escalation Skill | Passed |
+| W13 ten-case business evaluation | **10 / 10 structural passes** |
+| Read-only evaluation fixture checksum | Passed, unchanged |
+| W10 controlled writes, RBAC, approval and audit smoke | Passed |
+| Submission evidence gate | \`source_ready_live_verified\` |
 
-The observed failures include wrong tool selection, missing customer resolution, unsuccessful action proposal, and two 150-second timeouts. The GitHub Actions artifact contains the recorded tool/event paths. No human semantic accuracy or recommendation-quality verdict has been completed.
+### W13 case-level results (real model, measured duration)
 
-## NVIDIA-inspired draft PR #1
+| Case | Outcome | Duration |
+|---|---|---:|
+| EV01 — Sales customer profile | PASS | 9.34 s |
+| EV02 — Sales open issues | PASS | 11.70 s |
+| EV03 — Support conflicting issue history | PASS | 30.16 s |
+| EV04 — Sales escalation Skill | **PASS** | **8.94 s** |
+| EV05 — Sales scope denial | PASS | 5.98 s |
+| EV06 — Support unknown account | PASS | 10.97 s |
+| EV07 — Support status proposal | PASS | 24.21 s |
+| EV08 — Admin next-action proposal | PASS | 35.31 s |
+| EV09 — Sales write restriction | PASS | 0.07 s |
+| EV10 — General question without customer tools | PASS | 4.73 s |
 
-The feature branch implements typed request signals, authenticated Skill/proposal prerequisites, fixture integrity checks, trajectory evaluation, and a fixed risk-assessment clock *only for automated evaluation*. See docs/NVIDIA_BLUEPRINT_ADAPTATION.md.
+Durations are one successful GitHub-hosted CPU/model run, not a latency service-level guarantee. A local laptop may behave differently.
 
-**These changes are not yet verified to improve live model performance.** Preserve all failure cases and compare the new run against the original with identical baseline fixtures, prompt/model settings and evaluation clock.
+## How this changed
 
-An automated PASS verifies measured structure and specified record references. It does not independently prove that each natural-language factual claim is correct. A human reviewer must assess contradictory updates, missing information, recommendations and unauthorised actions. Do not substitute unit tests for measured inference.
+An earlier 10 November baseline (\`47eb98b\`, [run 42858736570](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42858736570)) produced **W07 3/5, W09 model-selected Skill failure and W13 6/10**. Subsequent typed routing, authenticated evidence preconditions and bounded source synthesis improved the result to W07 5/5 and W13 9/10. PR #2 resolved EV04 by binding a narrowly extracted, explicit current-turn customer name **after the model selected the authorised Skill**, leaving all customer/issue access under MCP and Keycloak. The final reference run achieved W13 10/10.
+
+## Limitations and required human review
+
+**Automated PASS measures tool trajectories, required evidence references, response terms, role restrictions and proposal boundaries. It does not establish that every free-text claim, inference, recommendation or quoted update is semantically correct.** The candidate should complete \`evals/manual_review_template.csv\` using the actual artifact, assess contradictions and missing information, and confirm the demo covers approved/denied writes. These assessments are **not claimed as completed**.
+
+This is a local, fictional technical-assessment implementation. Demo credentials, HTTP/Keycloak development configuration and seed data must not be exposed in a public deployment. Keep the repo private while EY's confidentiality restrictions apply.

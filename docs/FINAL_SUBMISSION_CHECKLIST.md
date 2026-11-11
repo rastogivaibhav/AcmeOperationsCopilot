@@ -1,57 +1,63 @@
-# Final EY submission and live verification checklist
+# EY assessment — final private-repository handover checklist
 
-## Important: status
+**Updated 11 November 2026.** The repository is a **private, local-only fictional prototype**. The latest completely verified reference is PR #2 at \`3437902f\`: [full-stack PASS](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983299825), [206-test CI PASS](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983305290). PR #2 was merged to \`main\` at \`1a2b936d3bd3\`, where [post-merge CI](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994299) also passed. Check [post-merge live integration](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994525) for its final status; the earlier reference pass is not proof that this separate run completed.
 
-Source through W14 is implemented and offline-tested. **The project has not been verified by a real Docker Compose boot or a GitHub Actions run in this environment.** The W13 automated case set is ready, but the actual ten-model-question metric is **not measured**. Do not treat this document as a signed acceptance report.
+## Five submission deliverables
 
-## The five EY deliverables
-
-| Deliverable | Location | Evidence level |
+| Item | Location | Verified state |
 |---|---|---|
-| Complete source, all configuration and Docker Compose | Repository root | Exists; Docker build not run |
-| README with setup, trade-offs and use of AI tools | `README.md` and `AI_USAGE.md` | Exists; setup unverified |
-| Architecture diagram showing component relationships and data flows | `docs/architecture.mmd` | Exists; not runtime-certified |
-| Evaluation results and commentary | `evals/report.md`; actual outputs under `evals/results/` | Suite specified; no live metrics |
-| AI-assisted development account | `AI_USAGE.md` | Exists; author must review for accuracy |
+| Complete source, configuration, Docker Compose | Repository root, \`compose.yaml\` | Both custom builds and full Compose startup passed |
+| Setup, trade-offs and AI usage | \`README.md\`, \`AI_USAGE.md\`, \`SECURITY.md\` | Updated handover; candidate must review personal AI-use disclosure |
+| Component/data-flow architecture | \`ARCHITECTURE.md\`, \`docs/architecture.mmd\` | Present; runtime tested, not production architecture certified |
+| Evaluation results and commentary | \`evals/report.md\`; private GitHub Actions \`acme-live-evaluation\` artifact | **W07 5/5, W08/W09 PASS, W13 10/10 structural PASS** on verified source revision |
+| Engineering decisions and limitations | \`AI_USAGE.md\`, \`SECURITY.md\`, \`docs/NVIDIA_BLUEPRINT_ADAPTATION.md\` | Recorded; candidate's independent judgement and human review are separate |
 
-## Run before submission (from a checked-out repository)
+## Final check before inviting EY reviewers
 
-1. Run `python -m pip install -e '.[test]' && sh scripts/verify_static.sh`.
-2. Run `python scripts/verify_release.py` and inspect the output.
-3. Run `docker compose up --build -d` and verify `docker compose ps` reports healthy services.
-4. Run `docker compose exec -T web python -m app.smoke` and `python -m app.smoke_w06`.
-5. Run `docker compose exec -T web python -m app.smoke_w10`; this writes **fictional test data** to the demo DB.
-6. Run `docker compose exec -T web python -m app.telemetry.smoke_w11`.
-7. Run `docker compose exec -T web python -m app.agent.probe`, `python -m app.agent.smoke_w08`, and `python -m app.skills.smoke_w09`.
-8. Run `docker compose exec -T web python -m evals.run_w13`; retain the generated report and record failures exactly as returned.
-9. Copy evaluated outputs: `docker compose cp web:/code/evals/results ./evals/results` and review the files for sensitive content.
-10. Fill in `evals/manual_review_template.csv` with an actual human judgement of factual grounding, missing information, action reasonableness and permissions. Do not infer semantic correctness from string matches.
-11. Run `python scripts/verify_release.py --submission` and record outcome. This checks the presence and reported success of W11 and W13 evidence; inspect W01–W10 outputs separately.
-12. Verify all five EY deliverables are present and the actual repository contains no confidential EY documents, `.env` file, real enterprise data or tokens.
+- [x] Private \`main\` contains merged PR #2 (\`1a2b936d3bd3\`).
+- [x] Source/static suite passed: **206 tests** on the assessed PR; post-merge CI also passed.
+- [x] Real Docker, Keycloak/OIDC, MCP, PostgreSQL, browser and role-isolation checks passed.
+- [x] W07 **5/5**, W08/W09 PASS and W13 **10/10** on the same assessed source revision.
+- [x] Read-only fixture integrity, controlled-write/idempotency/approval tests and submission evidence gate passed.
+- [ ] Check the **final** outcome of the separate post-merge live integration run and record its result.
+- [ ] Download/review private \`acme-live-evaluation\` artifact and manually assess every substantive business claim and recommendation using \`evals/manual_review_template.csv\`.
+- [ ] Personally review the architecture and AI-usage disclosure and prepare to explain trade-offs, security limitations, prompt/model failures and fixes in the interview.
+- [ ] Confirm only authorised EY reviewers receive access, and no confidential candidate assessment pack or real customer secrets are present.
+- [ ] Verify the expected submission time/date with EY if required; the original 9 November 2026 deadline referenced in earlier correspondence has passed.
 
-## GitHub actions
+## How to reproduce the full verification
 
-- The private repository `https://github.com/rastogivaibhav/AcmeOperationsCopilot` exists. Keep it private during assessment.
-- `bash scripts/publish_github.sh --private` from the extracted repository root if GitHub CLI is installed and authenticated.
-- `Acme Copilot CI` runs unit/static/Compose verification and builds both images.
-- `Acme Copilot Live Compose Integration` (manual dispatch) starts the full service graph and runs W07–W13 probes. Download its `acme-live-evaluation` artifact; review both failures and passing results.
-- A public repository is **not required** for Actions and would disclose the solution. Only change visibility after publication restrictions permit it.
+\`\`\`bash
+cp .env.example .env
+docker compose up --build -d
+docker compose exec -T web python -m app.smoke
+docker compose exec -T web python -m app.smoke_w06
+docker compose exec -T web python -m app.agent.probe
+docker compose exec -T web python -m app.agent.smoke_w08
+docker compose exec -T web python -m app.skills.smoke_w09
+docker compose exec -T web python -m evals.run_w13
+docker compose exec -T web python -m evals.fixture_guard --verify
+# Run controlled-write smoke only after the read-only evaluation.
+docker compose exec -T web python -m app.smoke_w10
+\`\`\`
 
-## 15-minute demo script
+The fixture verification above requires a baseline captured in the same run using \`docker compose exec -T web python -m evals.fixture_guard --capture\` **before** the W07–W13 tests. For a fully repeatable run without manual sequencing, use GitHub Actions **Acme Copilot Live Compose Integration**, which captures/verifies fixtures and uploads the results in the correct order. \`docker compose down -v\` destroys all local fictional data and model volumes.
 
-| Time | Proof | What to show |
-|---|---|---|
-| 0–3 min | Client problem and architecture | Real diagrams and local Docker stack |
-| 3–6 min | Sales identity and constrained customer lookup | Keycloak account, real MCP calls and source records |
-| 6–9 min | Support Skill and issue proposal | Model-selected read tools, explicit approval boundary |
-| 9–12 min | Admin action | User-confirmed next action, audit receipt, idempotent retry |
-| 12–15 min | Quality | Agent trace, ten-case evaluation outcomes, known defects/limitations |
+## Confidential sharing — private only
 
-## Known readiness blockers
+1. Open [the private repository](https://github.com/rastogivaibhav/AcmeOperationsCopilot).
+2. In GitHub, go to **Settings → Collaborators / Manage access → Add people** and invite each authorised EY reviewer's GitHub account. They must accept the invitation to view the repository.
+3. Send the repository URL and the [evaluation report](../evals/report.md) to the authorised panel through the existing recruitment channel. **Do not change the repo to public** while the assessment confidentiality restriction applies.
+4. GitHub Actions artifacts are accessible only to people with appropriate repository permissions.
 
-- The private GitHub repository is created. Source upload and workflow execution remain outstanding until a push succeeds.
-- Container images, Keycloak/OIDC live handshake, MCP transport and Ollama tool selection have not been verified on a Docker daemon.
-- W13 automated checks are **structural**. Human adjudication of every actual response is still necessary.
-- Model pull and CPU-only inference on a hosted GitHub runner can be slow and may exceed workflow budgets.
-- The submitted source uses fictional credentials for development; its HTTP/Keycloak start-dev configuration is **not production-ready**.
-- EY's stated deadline was 9 November 2026. Verify delivery with the recruiter if not already submitted.
+## Suggested 15-minute evaluator walkthrough
+
+| Time | Evidence |
+|---|---|
+| 0–3 min | Problem, architecture, local-only constraints |
+| 3–6 min | Sales sign-in, authenticated scoped customer lookup, denied write |
+| 6–9 min | Support history conflicts and evidence-linked escalation Skill |
+| 9–12 min | Admin proposal → deliberate human approval → audit and idempotent receipt |
+| 12–15 min | Real GitHub evaluation artifact, 10/10 structural gate, limitations and lessons |
+
+**Not claimed:** production hardening, external penetration testing, independent human semantic validation of all ten answers, or guaranteed inference latency.
