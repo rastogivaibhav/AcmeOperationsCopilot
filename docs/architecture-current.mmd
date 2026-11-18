@@ -18,7 +18,7 @@ flowchart TB
   Web <-->|"short-lived server-side session"| Redis
   Web -->|"checked identity and owned conversation"| Graph
   Graph <-->|"model prompts / tool-call choices; NO token"| LLM
-  Graph -->|"only model-visible approved tool schemas"| MCP
+  Graph -->|"authenticated model-selected MCP call"| MCP
   Graph -->|"model-selected local Skill"| Skill
   Skill -->|"nested authenticated MCP reads"| MCP
   Web -->|"user access token in trusted runtime only"| MCP
