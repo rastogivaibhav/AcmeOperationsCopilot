@@ -17,7 +17,7 @@ This manifest maps the five explicitly requested items in Section 5 of the candi
 ## Access and submission actions still owned by the candidate
 
 - [ ] Confirm the **48-hour deadline**, permitted mode of submission and permitted repository sharing with the recruiter.
-- [ ] Identify authorised EY reviewer GitHub usernames; invite **read-only** reviewers in **Settings → Collaborators / Manage access**. The repository URL by itself **will not grant access**.
+- [ ] Identify authorised EY reviewer GitHub usernames; invite authorised reviewers in **Settings → Collaborators / Manage access** with **least privilege available**. On a personal repository, standard collaborator invitations may grant write access; if read-only cannot be granted, prefer the recruiter-approved secure ZIP alternative. The repository URL by itself **will not grant access**.
 - [ ] If reviewers cannot authenticate to private GitHub, send the **source ZIP** through the recruiter-approved secure channel instead. The source archive is **not** the GitHub Actions evidence ZIP.
 - [ ] Verify the reviewer can open source, README, architecture, evaluation evidence and AI-usage document.
 - [ ] Personally review `AI_USAGE.md`, the real run outputs and the code. Complete `evals/manual_review_template.csv` if a personal semantic review has actually been performed; **do not mark it complete on the strength of automated tests alone**.
