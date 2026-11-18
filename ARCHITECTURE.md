@@ -1,6 +1,10 @@
-# Architecture — Implementation Slice W01–W05
+# Architecture — current design and historical implementation notes
 
-## Containers
+**Current authoritative architecture for the EY assessment:** [component relationships, data flows and two sequence diagrams](docs/architecture-review.md), with [Mermaid source](docs/architecture-current.mmd). The completed 11 November 2026 Docker/Keycloak/MCP/LangGraph integration is evidenced in [evals/EVIDENCE_MAIN.md](evals/EVIDENCE_MAIN.md). **The W01–W14 sections below are retained as a chronological design record. Early statements such as “not yet used” and “not verified” refer to that historical implementation stage, not the current main branch.**
+
+## Historical development snapshot — W01–W05
+
+## Containers (original W01–W05 plan; see current diagrams above)
 
 - `web` (custom FastAPI image): health endpoints; verifies Keycloak web-audience bearer JWT; MCP client proxy; explicit admin approval endpoint.
 - `mcp` (custom image): real MCP v2 Streamable HTTP; validates Keycloak MCP-audience JWT; typed domain tools; PostgreSQL queries.

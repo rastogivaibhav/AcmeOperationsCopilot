@@ -2,6 +2,33 @@
 
 # Acme Operations Copilot — EY case-study implementation
 
+## EY panel submission — five required deliverables
+
+Use the **[five-item EY submission manifest](docs/ASSESSMENT_SUBMISSION.md)** as the single handover index. It links the complete private source, current architecture and data-flow diagrams, measured evaluation output/commentary and AI-usage disclosure.
+
+| Requested item | Evidence |
+|---|---|
+| Source and configuration | This private GitHub repository (`main`), `compose.yaml`, two Dockerfiles, `.env.example`, migrations, app/MCP/tests |
+| README (setup, architecture, trade-offs, AI tools) | This file, [AI usage](AI_USAGE.md), [security](SECURITY.md) |
+| Current system-level architecture | [Reviewable diagrams](docs/architecture-review.md), [editable Mermaid source](docs/architecture-current.mmd) |
+| Evaluation output with commentary | [Full case-by-case evidence](evals/EVIDENCE_MAIN.md), [evaluation summary](evals/report.md), private GitHub Actions evidence artifact |
+| AI tool use and oversight | [Panel questions answered](AI_USAGE.md) |
+
+**Verified latest `main`**: commit `54442f2`; 206 CI tests, W07 5/5, W13 10/10, Keycloak/MCP, browser and controlled writes passed on [source CI](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42986664730) and [live integration](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42986664790). These are automated structural checks, not production or manual semantic certification.
+
+### Architecture decisions and trade-offs
+
+| Choice | Why used | Trade-off / next stage |
+|---|---|---|
+| FastAPI + Jinja2/vanilla JS | Small typed BFF and usable local UI with low frontend overhead | Less scalable client-side UI structure than a mature SPA |
+| LangGraph | Explicit reason/tool loop, bounded steps, durable checkpoints | Workflow orchestration adds state complexity; not the security boundary |
+| Ollama Qwen 2.5 3B | Local, self-contained inference; no external inference credentials | Higher latency and weaker tool-call reliability; measured and mitigated |
+| MCP | Stable tool contracts, independently authorised access to business data | Additional service and latency, justified by trust boundary |
+| Keycloak + Redis | Real OIDC identity, opaque browser sessions and concurrency locks | Demo identity mode / cookie settings require production hardening |
+| PostgreSQL + Alembic | ACID data, versioned schema, auditable writes, checkpoint persistence | Shared demo database/identity infrastructure requires production separation |
+| Deterministic Skill + human approvals | Verifiable risk rubric and no autonomous writes | Rule coverage limited; humans must validate recommendations |
+
+
 **Implementation slices:** W01–W14 source: platform, browser IAM, LangGraph agent, escalation Skill, controlled writes, activity/telemetry, ten-case evaluation harness and submission documentation.
 
 **Verified status (11 November 2026):** The fully tested PR #2 source revision `3437902f` passed **206 offline tests**, both Docker image builds, W07 **5/5**, W08 and W09, the W13 **10/10 structural evaluation**, real Keycloak/MCP/browser/controlled-write checks, and read-only fixture integrity. [Source CI](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983305290) · [Full live integration](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983299825). This was merged to `main` at `1a2b936d3bd3ddc77807ad170de6617e6d1f163e`; [post-merge CI](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994299) passed and the [post-merge full-stack run](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994525) **also passed** on the merged source revision, including W13 **10/10** and the live submission gate. The 10/10 result is **automated structural acceptance, not independent human factual review or production certification**.
@@ -99,7 +126,7 @@ The last API call is an **actual MCP protocol call**, not a REST implementation 
 | `get_issue_history` | issue_id | authorised read; Sales scoped | Implemented; live smoke verified |
 | `create_next_action` | issue_id, description, approval_id, operation_id | Admin, recorded human approval | Implemented; live smoke verified |
 
-**Write approval boundary:** Admin obtains a fresh, 10-minute approval receipt by explicitly calling `POST /api/approvals` with an authenticated bearer token and `confirmed: true`. The LLM/MCP layer cannot issue approvals. To commit, the authenticated admin invokes MCP `create_next_action` with the exact approval and operation IDs. PostgreSQL enforces `UNIQUE(operation_id)` for idempotency. The future web UI must provide a deliberate confirmation step and CSRF-protected BFF sessions; browser OIDC is W06.
+**Current write approval boundary:** The browser Action Centre uses `POST /api/actions/prepare` to create an unconfirmed actor-bound intent, then `POST /api/actions/{approval_id}/confirm` for an explicit authenticated confirmation. The BFF sends the confirmed intent through authenticated MCP, which independently checks role, approval and idempotent operation IDs and returns a verified receipt. The model itself cannot grant approval or commit a business write. A **legacy Admin-only** `POST /api/approvals` endpoint still accepts `confirmed: true` in a single request and should be removed before production; do not describe *every* path as strictly two-step. See [security limitations](SECURITY.md).
 
 The `issue_updates` seed includes contradictory notes and stale/missing updates to support later evaluation. The sample dates are a **2026-11-09 snapshot**, not live operational data.
 

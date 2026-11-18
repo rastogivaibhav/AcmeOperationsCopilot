@@ -1,0 +1,44 @@
+flowchart TB
+  User["Employee browser / sales, support, admin"]
+  KC["Keycloak OIDC / PKCE / signed JWT roles"]
+  Web["FastAPI BFF / Jinja2 workspace / CSRF / ownership"]
+  Redis[("Redis sessions + per-conversation locks")]
+  Graph["LangGraph bounded StateGraph / role-specific blueprint"]
+  LLM["Ollama / Qwen 2.5 3B / tool selection"]
+  Skill["Deterministic read-only customer escalation Skill"]
+  MCP["MCP Streamable HTTP server / independent JWT validation"]
+  Policy["MCP role + customer-scope policy"]
+  Pg[("PostgreSQL / business tables, approvals, audit, checkpoints")]
+  Review["Action Centre / explicit human prepare + confirm"]
+  Trace["OpenTelemetry + durable agent run events"]
+
+  User -->|"OIDC code + PKCE"| KC
+  KC -.->|"identity assertions"| Web
+  User -->|"opaque HttpOnly session cookie"| Web
+  Web <-->|"short-lived server-side session"| Redis
+  Web -->|"checked identity and owned conversation"| Graph
+  Graph <-->|"model prompts / tool-call choices; NO token"| LLM
+  Graph -->|"authenticated model-selected MCP call"| MCP
+  Graph -->|"model-selected local Skill"| Skill
+  Skill -->|"nested authenticated MCP reads"| MCP
+  Web -->|"user access token in trusted runtime only"| MCP
+  MCP -->|"verified JWT / role"| Policy
+  Policy -->|"parameterised customer-scoped SQL"| Pg
+  Graph <-->|"owner-bound durable checkpoints; NO token"| Pg
+  Web -->|"human reviews proposal"| Review
+  Review -->|"authenticated prepare + confirm"| Web
+  Web -->|"confirmed write tool with bound IDs"| MCP
+  Graph -->|"bounded telemetry metadata"| Trace
+  MCP -->|"auditable write receipt"| Trace
+  Trace -->|"sanitised runs + audit events"| Pg
+
+  classDef user fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef trusted fill:#dbeafe,stroke:#2563eb,color:#0f172a
+  classDef agent fill:#e0f2fe,stroke:#0284c7,color:#0f172a
+  classDef data fill:#dcfce7,stroke:#16a34a,color:#052e16
+  classDef gate fill:#fef3c7,stroke:#d97706,color:#713f12
+  class User user
+  class KC,Web,Redis,MCP,Policy trusted
+  class Graph,LLM,Skill agent
+  class Pg,Trace data
+  class Review gate
