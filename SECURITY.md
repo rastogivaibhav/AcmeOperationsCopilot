@@ -20,3 +20,7 @@
 ## Explicitly out of scope
 
 The demo uses loopback HTTP, `HttpOnly; SameSite=Lax` cookies without the production `Secure` flag, a development-mode Keycloak realm, shared demo PostgreSQL infrastructure and local fictional users. Do not expose ports, enable public access, or use real customer data. A production version would need HTTPS, secret management, hardened identity delegation and token exchange, separate service credentials, threat modelling, retention/deletion controls, operational monitoring and independent security review.
+
+## Explicit legacy approval endpoint limitation
+
+The newer Action Centre provides an actor-bound prepare/confirm workflow, but `app/main.py` also retains a **legacy Admin-only `/api/approvals`** endpoint that creates an already-confirmed approval record when the authenticated caller submits `confirmed: true`. It is **not** a model-accessible approval tool and remains role/CSRF protected, but it weakens any claim that all approval creation uses separate review and confirmation requests. Retire or migrate this endpoint before production; preserve the tested case-study behaviour for the interview.

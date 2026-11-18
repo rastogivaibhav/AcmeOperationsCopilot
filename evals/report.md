@@ -1,5 +1,8 @@
 # Acme Operations Copilot — measured agent evaluation
 
+> **Latest main-branch evidence:** [W13 case-by-case output and commentary](EVIDENCE_MAIN.md) covers the completed [GitHub Actions run 42986664790](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42986664790) for commit `54442f2`. **W07 5/5, W08/W09 PASS, W13 10/10, 206 source tests**, fixture integrity and approved-write checks passed on the same source revision. Raw JSON is available in that private Actions artifact. Case-level durations below refer to the earlier PR #2 run, not this final `main` run.
+
+
 **Completed full-stack acceptance (11 November 2026): PASS on PR #2 source revision**
 `3437902f4448b002d1e978feb0d2ce06e6451f3e`.
 

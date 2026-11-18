@@ -1,16 +1,18 @@
 # EY assessment — final private-repository handover checklist
 
-**Updated 11 November 2026.** The repository is a **private, local-only fictional prototype**. The latest completely verified reference is PR #2 at `3437902f`: [full-stack PASS](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983299825), [206-test CI PASS](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983305290). PR #2 was merged to `main` at `1a2b936d3bd3`, where [post-merge CI](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994299) also passed. [Post-merge live integration](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994525) **also passed** on `main`, including W07 **5/5**, W08/W09 and W13 **10/10**.
+**Updated 18 November 2026.** The repository is a **private, local-only fictional prototype**. The latest completely verified reference is PR #2 at `3437902f`: [full-stack PASS](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983299825), [206-test CI PASS](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42983305290). PR #2 was merged to `main` at `1a2b936d3bd3`, where [post-merge CI](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994299) also passed. [Post-merge live integration](https://github.com/rastogivaibhav/AcmeOperationsCopilot/actions/runs/42984994525) **also passed** on `main`, including W07 **5/5**, W08/W09 and W13 **10/10**.
 
 ## Five submission deliverables
+
+The [EY five-item submission manifest](ASSESSMENT_SUBMISSION.md) gives each reviewer the exact link and distinguishes completed artefacts from access/deadline tasks that the candidate must perform.
 
 | Item | Location | Verified state |
 |---|---|---|
 | Complete source, configuration, Docker Compose | Repository root, `compose.yaml` | Both custom builds and full Compose startup passed |
 | Setup, trade-offs and AI usage | `README.md`, `AI_USAGE.md`, `SECURITY.md` | Updated handover; candidate must review personal AI-use disclosure |
-| Component/data-flow architecture | `ARCHITECTURE.md`, `docs/architecture.mmd` | Present; runtime tested, not production architecture certified |
-| Evaluation results and commentary | `evals/report.md`; private GitHub Actions `acme-live-evaluation` artifact | **W07 5/5, W08/W09 PASS, W13 10/10 structural PASS** on verified source revision |
-| Engineering decisions and limitations | `AI_USAGE.md`, `SECURITY.md`, `docs/NVIDIA_BLUEPRINT_ADAPTATION.md` | Recorded; candidate's independent judgement and human review are separate |
+| Component/data-flow architecture | `docs/architecture-review.md`, `docs/architecture-current.mmd` | Current two-way data-flow and write-approval diagrams supplied; not production architecture certified |
+| Evaluation results and commentary | `evals/EVIDENCE_MAIN.md`, `evals/report.md`; private GitHub Actions `acme-live-evaluation` artifact | **W07 5/5, W08/W09 PASS, W13 10/10 structural PASS**, source traces and per-case commentary |
+| AI-assisted development disclosure | `AI_USAGE.md` — explicit answers to EY's four panel questions | Recorded; candidate's independent judgement and human review are separate |
 
 ## Final check before inviting EY reviewers
 
@@ -62,3 +64,9 @@ The fixture baseline is captured before W07–W13 in the command sequence above,
 | 12–15 min | Real GitHub evaluation artifact, 10/10 structural gate, limitations and lessons |
 
 **Not claimed:** production hardening, external penetration testing, independent human semantic validation of all ten answers, or guaranteed inference latency.
+
+## Brief-specific requirements to complete before submitting
+
+- [ ] Confirm the **48-hour window from receipt of the candidate brief**, or any agreed extension, with the recruiter. Do not assume the historical date is the actual permitted submission deadline.
+- [ ] Ensure reviewers have **private repository access**, or use the recruiter-approved secure **source ZIP** alternative.
+- [ ] Confirm the README, architecture, evaluation and AI usage are all accessible using [the manifest](ASSESSMENT_SUBMISSION.md).

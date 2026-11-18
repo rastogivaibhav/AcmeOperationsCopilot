@@ -1,12 +1,12 @@
 # Acme Operations Copilot — current system architecture
 
-**Version:** as inspected on \`main\` in November 2026 · **Purpose:** EY panel deliverable 3. This describes the **implemented and tested** architecture, not a production target-state diagram. Original W01–W05 slice notes are historical.
+**Version:** as inspected on `main` in November 2026 · **Purpose:** EY panel deliverable 3. This describes the **implemented and tested** architecture, not a production target-state diagram. Original W01–W05 slice notes are historical.
 
 ## End-to-end components and data flows
 
 The following Mermaid flowchart renders inside GitHub. Open the standalone [source diagram](architecture-current.mmd) if you wish to edit it or use a Mermaid renderer.
 
-\`\`\`mermaid
+```mermaid
 flowchart TB
   User["Employee browser / sales, support, admin"]
   KC["Keycloak OIDC / PKCE / signed JWT roles"]
@@ -51,11 +51,11 @@ flowchart TB
   class Graph,LLM,Skill agent
   class Pg,Trace data
   class Review gate
-\`\`\`
+```
 
 ## Business lookup and evidence sequence
 
-\`\`\`mermaid
+```mermaid
 sequenceDiagram
   actor U as Authenticated employee
   participant Web as FastAPI BFF
@@ -80,11 +80,11 @@ sequenceDiagram
   Graph->>Graph: Evidence-only synthesis where defined
   Graph-->>Web: Answer, source IDs, safe proposal (if requested)
   Web-->>U: Answer, approval UI and run evidence
-\`\`\`
+```
 
 ## Human-approved write sequence
 
-\`\`\`mermaid
+```mermaid
 sequenceDiagram
   actor U as Verified Support/Admin user
   participant A as LangGraph
@@ -105,7 +105,7 @@ sequenceDiagram
   DB-->>MCP: Receipt/operation ID
   MCP-->>W: Verified outcome
   W-->>U: Committed or conflict; no fabricated success
-\`\`\`
+```
 
 ## What each choice protects
 
@@ -122,17 +122,17 @@ sequenceDiagram
 ## Critical limitations to state aloud
 
 1. **Identity hardening:** Keycloak runs in development mode and demo tokens contain two audiences. Production needs TLS, proper delegation/token exchange, secrets separation and identity hardening.
-2. **Legacy route:** \`POST /api/approvals\` permits a one-request explicit Admin confirmation path. The newer Action Centre uses a separate prepare/confirm flow, but the legacy route should be removed or migrated before production.
+2. **Legacy route:** `POST /api/approvals` permits a one-request explicit Admin confirmation path. The newer Action Centre uses a separate prepare/confirm flow, but the legacy route should be removed or migrated before production.
 3. **Model capability:** small local model chosen for self-contained demonstration. Ten passing evaluation cases do not prove general robustness or the semantic truth of every answer.
 4. **Threat modeling:** tested role/customer denials and browser ownership, **not** an external penetration test or exhaustive prompt-injection evaluation.
 
 ## Source map
 
-- \`app/main.py\`: BFF API, route security, graph invocation, Action Centre endpoints.
-- \`app/auth/oidc.py\`, \`acme_shared/policies.py\`: authentication, roles and CSRF.
-- \`app/agent/graph.py\`, \`app/agent/intent.py\`, \`app/agent/evidence.py\`: reasoning, tool selection, context and evidence.
-- \`app/skills/escalation.py\`: deterministic risk assessment through scoped MCP.
-- \`app/agent/dependencies.py\`, \`app/action_service.py\`: guarded proposal/read prerequisites and human approval.
-- \`mcp_server/server.py\`, \`mcp_server/repository.py\`: independently authorised MCP and business SQL.
-- \`database/migrations/\`, \`database/fixtures/seed.sql\`: schema and fictional fixtures.
-- \`evals/run_w13.py\`, \`evals/fixture_guard.py\`: reproducible tests.
+- `app/main.py`: BFF API, route security, graph invocation, Action Centre endpoints.
+- `app/auth/oidc.py`, `acme_shared/policies.py`: authentication, roles and CSRF.
+- `app/agent/graph.py`, `app/agent/intent.py`, `app/agent/evidence.py`: reasoning, tool selection, context and evidence.
+- `app/skills/escalation.py`: deterministic risk assessment through scoped MCP.
+- `app/agent/dependencies.py`, `app/action_service.py`: guarded proposal/read prerequisites and human approval.
+- `mcp_server/server.py`, `mcp_server/repository.py`: independently authorised MCP and business SQL.
+- `database/migrations/`, `database/fixtures/seed.sql`: schema and fictional fixtures.
+- `evals/run_w13.py`, `evals/fixture_guard.py`: reproducible tests.
